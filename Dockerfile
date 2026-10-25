@@ -1,0 +1,42 @@
+# syntax=docker/dockerfile:1.7
+
+FROM node:22-slim AS web
+WORKDIR /web
+COPY web/package.json web/package-lock.json ./
+RUN npm ci
+COPY web/ ./
+RUN npm run build
+
+FROM python:3.11-slim AS runtime
+ENV PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PIP_NO_CACHE_DIR=1 \
+    DATA_DIR=/data \
+    TZ=Asia/Shanghai \
+    HF_HOME=/data/models
+
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends libgomp1 gosu ca-certificates tzdata \
+    && rm -rf /var/lib/apt/lists/* \
+    && useradd --create-home --uid 1000 --shell /usr/sbin/nologin appuser
+
+WORKDIR /app
+COPY requirements.txt ./
+RUN pip install --no-cache-dir -r requirements.txt
+
+COPY app ./app
+COPY demo ./demo
+COPY scripts/entrypoint.sh /usr/local/bin/entrypoint.sh
+COPY --from=web /web/dist ./app/static
+RUN chmod +x /usr/local/bin/entrypoint.sh \
+    && mkdir -p /data \
+    && chown -R appuser:appuser /app /data
+
+VOLUME ["/data"]
+EXPOSE 8080
+
+HEALTHCHECK --interval=30s --timeout=6s --start-period=20s --retries=3 \
+  CMD python -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/api/health', timeout=4)"
+
+ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
+CMD ["uvicorn", "app.main:create_app", "--factory", "--host", "0.0.0.0", "--port", "8080", "--workers", "1", "--proxy-headers", "--forwarded-allow-ips", "*"]

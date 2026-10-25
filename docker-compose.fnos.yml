@@ -1,0 +1,44 @@
+# fnOS / NAS 安装：直接拉取 GHCR 预构建镜像，不在设备上编译。
+# 用法：cp .env.example .env 并修改密码，然后
+#   docker compose -f docker-compose.fnos.yml up -d
+name: shengce
+
+services:
+  app:
+    image: ghcr.io/ay-cc-coder/shengce:latest
+    container_name: shengce
+    restart: unless-stopped
+    env_file:
+      - .env
+    ports:
+      - "${APP_BIND:-0.0.0.0}:${APP_PORT:-3000}:8080"
+    volumes:
+      - ./data:/data
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/api/health', timeout=4)"]
+      interval: 30s
+      timeout: 6s
+      start_period: 30s
+      retries: 3
+
+  caddy:
+    image: caddy:2.9
+    container_name: shengce-caddy
+    profiles: ["tls"]
+    restart: unless-stopped
+    depends_on:
+      app:
+        condition: service_healthy
+    environment:
+      DOMAIN: ${DOMAIN}
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+
+volumes:
+  caddy_data:
+  caddy_config:

@@ -1,0 +1,15 @@
+.env
+/data/*
+!/data/.gitkeep
+.venv/
+.npm-cache/
+.pip-cache/
+__pycache__/
+.pycache/
+*.pyc
+.pytest_cache/
+app/static/
+web/node_modules/
+web/dist/
+web/.vite/
+.DS_Store

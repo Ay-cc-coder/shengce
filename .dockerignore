@@ -1,0 +1,13 @@
+.git
+.gitignore
+.env
+data
+.venv
+__pycache__
+*.pyc
+.pytest_cache
+web/node_modules
+web/dist
+docs/screenshots
+*.md
+!PRODUCT.md
