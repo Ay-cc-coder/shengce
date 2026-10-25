@@ -1,5 +1,7 @@
 # 声册 / Shengce
 
+[![docker](https://github.com/Ay-cc-coder/shengce/actions/workflows/docker.yml/badge.svg)](https://github.com/Ay-cc-coder/shengce/actions/workflows/docker.yml)
+
 把 iPhone 上传的通话录音和语音备忘收进一台自己的服务器，自动整理成可以回听的对话、摘要和待办，并按联系人看清谁在频繁联系你。
 
 ![总览](docs/screenshots/01-overview-fold.jpg)
@@ -298,7 +300,9 @@ docker项目/
 ├── tests/                后端测试
 ├── docs/                 架构说明、截图
 ├── Dockerfile
-├── docker-compose.yml
+├── docker-compose.yml        源码构建 / 本机开发
+├── docker-compose.fnos.yml   fnOS 预构建镜像
+├── .github/workflows/        GHCR 多架构镜像构建
 ├── Caddyfile
 ├── PRODUCT.md
 └── DESIGN.md

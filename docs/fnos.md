@@ -24,11 +24,12 @@ sudo chown -R "$(id -u):$(id -g)" /vol1/1000/docker/shengce
 cd /vol1/1000/docker/shengce
 ```
 
-下载两个文件：
+下载三个文件（`Caddyfile` 只有启用 HTTPS 时才用得到，但一起下载最省事）：
 
 ```bash
 curl -fLO https://raw.githubusercontent.com/Ay-cc-coder/shengce/main/docker-compose.fnos.yml
 curl -fLO https://raw.githubusercontent.com/Ay-cc-coder/shengce/main/.env.example
+curl -fLO https://raw.githubusercontent.com/Ay-cc-coder/shengce/main/Caddyfile
 mv .env.example .env
 ```
 
@@ -91,6 +92,8 @@ Caddy 会自动申请证书。手机里填写：
 - 密码：`.env` 的 `DAV_PASSWORD`
 
 如果 fnOS 已经用别的反向代理提供 HTTPS，也可以只运行 app，把 3000 端口代理到你的域名；注意不要剥掉 `/dav/` 前缀。
+
+如果 80/443 已经被 fnOS 或其他服务占用，请不要强行占用；改用已有反代，或把 `docker-compose.fnos.yml` 里 Caddy 的端口改成其他值并做好转发。
 
 ## 更新
 
