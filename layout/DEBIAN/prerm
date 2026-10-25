@@ -1,0 +1,4 @@
+#!/bin/sh
+PLIST="/Library/LaunchDaemons/com.liseng.audiowatch.daemon.plist"
+/usr/bin/launchctl bootout system "$PLIST" >/dev/null 2>&1 || true
+exit 0

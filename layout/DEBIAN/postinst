@@ -1,0 +1,31 @@
+#!/bin/sh
+set -e
+
+LABEL="com.liseng.audiowatch.daemon"
+PLIST="/Library/LaunchDaemons/${LABEL}.plist"
+APP="/Applications/AudioWatch.app"
+DAEMON="/usr/local/libexec/AudioWatchDaemon"
+
+/usr/bin/launchctl bootout system "$PLIST" >/dev/null 2>&1 || true
+
+/usr/bin/mkdir -p /var/mobile/Library/Preferences/com.liseng.audiowatch/config
+/usr/bin/mkdir -p /var/mobile/Library/Preferences/com.liseng.audiowatch/state
+/usr/bin/mkdir -p /var/mobile/Library/Logs
+/usr/bin/chown -R mobile:mobile /var/mobile/Library/Preferences/com.liseng.audiowatch
+/usr/bin/chmod 755 /var/mobile/Library/Preferences/com.liseng.audiowatch
+/usr/bin/chmod 755 /var/mobile/Library/Preferences/com.liseng.audiowatch/config
+/usr/bin/chmod 755 /var/mobile/Library/Preferences/com.liseng.audiowatch/state
+/usr/bin/chmod 644 /var/mobile/Library/Logs/AudioWatch.log 2>/dev/null || true
+
+if [ ! -x "$DAEMON" ]; then
+    echo "AudioWatchDaemon is missing" >&2
+    exit 1
+fi
+
+/usr/bin/launchctl bootstrap system "$PLIST" || /usr/bin/launchctl load -w "$PLIST" || true
+
+if [ -d "$APP" ]; then
+    /usr/bin/uicache -p "$APP" >/dev/null 2>&1 || true
+fi
+/usr/bin/uicache -a >/dev/null 2>&1 || true
+exit 0

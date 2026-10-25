@@ -1,0 +1,10 @@
+Package: com.liseng.audiowatch
+Name: 录音监控
+Version: 1.0.6
+Architecture: iphoneos-arm64e
+Description: 选择文件夹，先验证 WebDAV，再把已有和新录音按原文件名上传；断网时保留队列并自动续传。
+Maintainer: liseng
+Author: liseng
+Section: Applications
+Priority: optional
+Depends: firmware (>= 15.0)
