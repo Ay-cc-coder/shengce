@@ -24,11 +24,12 @@ sudo chown -R "$(id -u):$(id -g)" /vol1/1000/docker/shengce
 cd /vol1/1000/docker/shengce
 ```
 
-下载三个文件（`Caddyfile` 只有启用 HTTPS 时才用得到，但一起下载最省事）：
+下载文件（`docker-compose.tls.yml` 和 `Caddyfile` 只有用 Caddy 时才需要）：
 
 ```bash
 curl -fLO https://raw.githubusercontent.com/Ay-cc-coder/shengce/main/docker-compose.fnos.yml
 curl -fLO https://raw.githubusercontent.com/Ay-cc-coder/shengce/main/.env.example
+curl -fLO https://raw.githubusercontent.com/Ay-cc-coder/shengce/main/docker-compose.tls.yml
 curl -fLO https://raw.githubusercontent.com/Ay-cc-coder/shengce/main/Caddyfile
 mv .env.example .env
 ```
@@ -71,7 +72,58 @@ docker compose up -d --build
 
 「录音监控」只接受 HTTPS。WebUI 的 `http://IP:3000` 可以打开，但手机 WebDAV 测试会失败。
 
-在 `.env` 设置：
+默认的 `docker-compose.fnos.yml` **只启动 app，不使用 80/443**。它只占用 `APP_PORT`（默认 3000）。HTTPS 有两种做法：
+
+### 方式 A：复用 fnOS 已有反向代理（推荐）
+
+fnOS 通常已经有 443 上的管理页面/反向代理，或者你装了 1Panel、Lucky、Nginx Proxy Manager 等。不要再启动 Caddy，直接把 HTTPS 域名代理到 app：
+
+```text
+https://record.example.com  →  http://127.0.0.1:3000
+```
+
+要点：
+
+- 保留原始路径，**不要剥掉 `/dav/` 前缀**；
+- 上传体积限制调到至少 512 MB；
+- 关闭请求缓冲或把超时调大（WebDAV 大文件 PUT 需要）；
+- 设置 `X-Forwarded-Proto: https`，否则登录 Cookie 不会被标记为 Secure；
+- 证书用 fnOS/反代现有的 Let's Encrypt 证书即可，不需要 80/443 再给 Caddy。
+
+如果反向代理本身跑在容器里，`127.0.0.1` 不一定指向宿主机；这时把代理目标改成宿主机的局域网 IP（如 `192.168.5.141:3000`）或两者共用的 Docker 网络地址。
+
+然后在 `.env` 里把 app 收到本机回环：
+
+```dotenv
+APP_BIND=127.0.0.1
+PUBLIC_URL=https://record.example.com
+```
+
+重启：
+
+```bash
+docker compose -f docker-compose.fnos.yml up -d --force-recreate
+```
+
+手机里填写 `https://record.example.com/dav/`，账号密码用 `.env` 里的 `DAV_USERNAME` / `DAV_PASSWORD`。
+
+Nginx 示例（路径要落在 `/`，不要只转发 `/api`）：
+
+```nginx
+location / {
+    proxy_pass http://127.0.0.1:3000;
+    proxy_set_header Host $host;
+    proxy_set_header X-Forwarded-Proto https;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    client_max_body_size 512m;
+    proxy_request_buffering off;
+    proxy_read_timeout 300s;
+}
+```
+
+### 方式 B：Caddy 使用 80/443（仅当端口空闲）
+
+只有确认 fnOS 上没有服务占用 80/443 时，才叠加 TLS 文件：
 
 ```dotenv
 DOMAIN=record.example.com
@@ -79,21 +131,21 @@ PUBLIC_URL=https://record.example.com
 APP_BIND=127.0.0.1
 ```
 
-确保域名的 A/AAAA 记录指向 fnOS，且路由器把 80/443 转发到 fnOS，然后：
-
 ```bash
-docker compose -f docker-compose.fnos.yml --profile tls up -d
+docker compose -f docker-compose.fnos.yml -f docker-compose.tls.yml up -d
 ```
 
-Caddy 会自动申请证书。手机里填写：
+Caddy 会自动申请证书。如果 80/443 已被占用，**不要**强行启动这个文件；这不会因为改了 Caddy 端口就能自动签发证书，应该用方式 A，或使用 Cloudflare Tunnel / Tailscale 之类不占本机 80/443 的入口。
 
-- WebDAV 地址：`https://record.example.com/dav/`
-- 账号：`.env` 的 `DAV_USERNAME`
-- 密码：`.env` 的 `DAV_PASSWORD`
+### 如果 80/443 被占用又没有反代
 
-如果 fnOS 已经用别的反向代理提供 HTTPS，也可以只运行 app，把 3000 端口代理到你的域名；注意不要剥掉 `/dav/` 前缀。
+可选：
 
-如果 80/443 已经被 fnOS 或其他服务占用，请不要强行占用；改用已有反代，或把 `docker-compose.fnos.yml` 里 Caddy 的端口改成其他值并做好转发。
+- 安装 1Panel / Lucky / Nginx Proxy Manager，用它们现有的 443 和证书；
+- 用 Cloudflare Tunnel 或 Tailscale Serve 提供受信任的 HTTPS 入口；
+- 不建议用自签名证书：iOS 插件不会绕过校验。
+
+手机端只需要一个受信任的 HTTPS 地址，不要求这个地址由本项目的 Caddy 提供。
 
 ## 更新
 

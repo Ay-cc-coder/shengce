@@ -1,5 +1,6 @@
 # fnOS / NAS 安装：直接拉取 GHCR 预构建镜像，不在设备上编译。
-# 用法：cp .env.example .env 并修改密码，然后
+# 默认只启动 app，只占用宿主机的 APP_PORT（默认 3000），不使用 80/443。
+# HTTPS 推荐交给 fnOS 已有的反向代理；如果 80/443 空闲，可叠加 docker-compose.tls.yml。
 #   docker compose -f docker-compose.fnos.yml up -d
 name: shengce
 
@@ -20,25 +21,3 @@ services:
       timeout: 6s
       start_period: 30s
       retries: 3
-
-  caddy:
-    image: caddy:2.9
-    container_name: shengce-caddy
-    profiles: ["tls"]
-    restart: unless-stopped
-    depends_on:
-      app:
-        condition: service_healthy
-    environment:
-      DOMAIN: ${DOMAIN}
-    ports:
-      - "80:80"
-      - "443:443"
-    volumes:
-      - ./Caddyfile:/etc/caddy/Caddyfile:ro
-      - caddy_data:/data
-      - caddy_config:/config
-
-volumes:
-  caddy_data:
-  caddy_config:

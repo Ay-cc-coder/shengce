@@ -92,7 +92,7 @@ PUBLIC_URL=https://record.example.com
 APP_BIND=127.0.0.1
 ```
 
-启动 TLS profile：
+启动 TLS profile（**仅当宿主机的 80/443 空闲**）：
 
 ```bash
 docker compose --profile tls up -d --build
@@ -100,11 +100,13 @@ docker compose --profile tls up -d --build
 
 Caddy 会自动申请证书。确认 `https://record.example.com/dav/` 可以被访问后，再在手机上测试。
 
+> NAS 上 80/443 通常已被管理页面占用。这种情况不要启动这个 profile；直接用系统已有的反向代理把 `https://你的域名` 转发到 `127.0.0.1:3000`，保留 `/dav/` 路径即可。fnOS 的具体做法见 [docs/fnos.md](docs/fnos.md)。
+
 如果已经有 Nginx / Traefik，代理到 `127.0.0.1:3000` 即可。注意 **不要剥掉 `/dav/` 前缀**，并放宽上传体积限制（默认单文件上限 512 MB）。
 
 ### 在 fnOS 上用 Compose 安装
 
-仓库提供了 [docker-compose.fnos.yml](docker-compose.fnos.yml)，直接拉取 GHCR 预构建镜像，不需要在 NAS 上编译：
+仓库提供了 [docker-compose.fnos.yml](docker-compose.fnos.yml)，直接拉取 GHCR 预构建镜像，不需要在 NAS 上编译。**默认只占用 3000，不使用 80/443。**
 
 ```bash
 git clone https://github.com/Ay-cc-coder/shengce.git
@@ -115,7 +117,9 @@ docker compose -f docker-compose.fnos.yml pull
 docker compose -f docker-compose.fnos.yml up -d
 ```
 
-打开 `http://fnOS的IP:3000`。手机 WebDAV 仍需 HTTPS，步骤见 [docs/fnos.md](docs/fnos.md)。
+打开 `http://fnOS的IP:3000`。
+
+手机 WebDAV 需要 HTTPS，推荐直接用 fnOS 已有的 443 反向代理到 `127.0.0.1:3000`，不需要启动 Caddy；只有 80/443 空闲时才叠加 [docker-compose.tls.yml](docker-compose.tls.yml)。完整步骤和 Nginx 示例见 [docs/fnos.md](docs/fnos.md)。
 
 ## 演示数据
 
@@ -301,7 +305,8 @@ docker项目/
 ├── docs/                 架构说明、截图
 ├── Dockerfile
 ├── docker-compose.yml        源码构建 / 本机开发
-├── docker-compose.fnos.yml   fnOS 预构建镜像
+├── docker-compose.fnos.yml   fnOS 预构建镜像（仅 3000）
+├── docker-compose.tls.yml    可选 Caddy 80/443
 ├── .github/workflows/        GHCR 多架构镜像构建
 ├── Caddyfile
 ├── PRODUCT.md
