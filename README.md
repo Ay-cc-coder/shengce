@@ -54,79 +54,87 @@ iPhone「录音监控」
 
 ### 1. 启动
 
+主 compose 文件就是 [`docker-compose.yml`](docker-compose.yml)，它只做三件事：拉取公开镜像、映射 3000 端口、挂载 `./data`。**不使用 80/443，也不启动 Caddy。**
+
 ```bash
 cd docker项目
-cp .env.example .env
-# 打开 .env，至少改 ADMIN_PASSWORD 和 DAV_PASSWORD
-docker compose up -d --build
+# 先打开 docker-compose.yml，修改 ADMIN_PASSWORD 和 DAV_PASSWORD
+docker compose up -d
 ```
 
 打开 `http://localhost:3000`。
 
-没有在 `.env` 里设置密码时，首次启动会自动生成：
-
-- 管理台密码：`data/admin-password.txt`，同时打印在 `docker compose logs app` 里
-- WebDAV 密码：`data/dav-password.txt`
-
-Docker 镜像第一次构建会下载 Python 依赖和语音库，通常需要几分钟。镜像启动后，首次转写还会下载 Whisper 模型到 `data/models/`。
+- 第一次会拉取 `ghcr.io/ay-cc-coder/shengce:latest`，镜像较大，需要等几分钟；
+- 首次转写会下载 Whisper 模型到 `data/models/`；
+- 没有 `.env` 文件，也没有构建步骤；
+- 如果 3000 被占用，改 `docker-compose.yml` 里的 `"3000:8080"` 即可。
 
 ### 2. 在手机上接入
 
 1. 手机安装配套的「录音监控」插件（本仓库上一级的 iOS 项目）。
 2. 打开 App，填写：
    - WebDAV 地址：`https://你的域名/dav/`
-   - 账号：`.env` 里的 `DAV_USERNAME`，默认 `audiowatch`
-   - 密码：`.env` 里的 `DAV_PASSWORD`
+   - 账号：`docker-compose.yml` 里的 `DAV_USERNAME`，默认 `audiowatch`
+   - 密码：`docker-compose.yml` 里的 `DAV_PASSWORD`
 3. 点“测试连接”。地址、账号、写入权限三项都通过后，选好录音文件夹并开始监控。
 4. 已有文件会先上传；之后出现的新文件会自动进来。测试用的 `audiowatch-connection-test-*.txt` 不会写入资料库。
 
-> **手机插件只接受 HTTPS。** 直接用 `http://局域网IP:3000` 可以打开 WebUI，但手机的 WebDAV 测试会失败。生产环境请使用下面的 Caddy 或你自己的反向代理。
+> **手机插件只接受 HTTPS。** `http://局域网IP:3000` 可以打开 WebUI，但手机 WebDAV 测试会失败。
 
-### 3. 用 Caddy 加 HTTPS（推荐）
+### 3. HTTPS：优先复用已有反向代理
 
-准备一个解析到这台服务器的域名，然后在 `.env` 里设置：
+**主 compose 不监听 80/443。** 大多数 NAS 的 80/443 已经被管理页面或反向代理占用，直接让已有反代把域名转发到 `127.0.0.1:3000` 即可：
 
-```dotenv
-DOMAIN=record.example.com
-PUBLIC_URL=https://record.example.com
-APP_BIND=127.0.0.1
+```text
+https://record.example.com  →  http://127.0.0.1:3000
 ```
 
-启动 TLS profile（**仅当宿主机的 80/443 空闲**）：
+反代要保留 `/dav/` 路径、允许 512 MB 上传、设置 `X-Forwarded-Proto: https`。完整的 Nginx 示例和 fnOS 说明见 [docs/fnos.md](docs/fnos.md)。
+
+只有确认 80/443 空闲时，才叠加可选的 Caddy：
 
 ```bash
-docker compose --profile tls up -d --build
+# 先修改 docker-compose.tls.yml 里的 DOMAIN
+docker compose -f docker-compose.yml -f docker-compose.tls.yml up -d
 ```
 
-Caddy 会自动申请证书。确认 `https://record.example.com/dav/` 可以被访问后，再在手机上测试。
+如果 80/443 已被占用，这一步会报 `port is already allocated`；**不要用改 Caddy 端口的办法解决证书问题**，改用已有反代、Cloudflare Tunnel 或 Tailscale。
 
-> NAS 上 80/443 通常已被管理页面占用。这种情况不要启动这个 profile；直接用系统已有的反向代理把 `https://你的域名` 转发到 `127.0.0.1:3000`，保留 `/dav/` 路径即可。fnOS 的具体做法见 [docs/fnos.md](docs/fnos.md)。
+### 从源码构建（可选）
 
-如果已经有 Nginx / Traefik，代理到 `127.0.0.1:3000` 即可。注意 **不要剥掉 `/dav/` 前缀**，并放宽上传体积限制（默认单文件上限 512 MB）。
-
-### 在 fnOS 上用 Compose 安装
-
-仓库提供了 [docker-compose.fnos.yml](docker-compose.fnos.yml)，直接拉取 GHCR 预构建镜像，不需要在 NAS 上编译。**默认只占用 3000，不使用 80/443。**
+只有想自己编译镜像时才需要完整仓库：
 
 ```bash
 git clone https://github.com/Ay-cc-coder/shengce.git
 cd shengce
 cp .env.example .env
-# 修改 ADMIN_PASSWORD / DAV_PASSWORD / APP_PORT
-docker compose -f docker-compose.fnos.yml pull
-docker compose -f docker-compose.fnos.yml up -d
+# 修改 .env
+docker compose -f docker-compose.build.yml up -d --build
 ```
 
-打开 `http://fnOS的IP:3000`。
+### 在 fnOS 上用 Compose 安装
 
-手机 WebDAV 需要 HTTPS，推荐直接用 fnOS 已有的 443 反向代理到 `127.0.0.1:3000`，不需要启动 Caddy；只有 80/443 空闲时才叠加 [docker-compose.tls.yml](docker-compose.tls.yml)。完整步骤和 Nginx 示例见 [docs/fnos.md](docs/fnos.md)。
+fnOS 直接使用根目录的 `docker-compose.yml`，不需要单独的 fnOS 文件：
+
+```bash
+git clone https://github.com/Ay-cc-coder/shengce.git
+cd shengce
+# 修改 docker-compose.yml 里的两个密码
+docker compose up -d
+```
+
+默认只占用 3000，不影响 NAS 的 80/443。手机 HTTPS 推荐复用 fnOS 已有的 443 反向代理；详细步骤见 [docs/fnos.md](docs/fnos.md)。
 
 ## 演示数据
 
 想在没接手机前先看看界面：
 
+1. 把 `docker-compose.yml` 里的 `DEMO_MODE` 改成 `"1"`；
+2. 确认 `data/` 是空的；
+3. 执行：
+
 ```bash
-DEMO_MODE=1 docker compose up -d --build
+docker compose up -d --force-recreate
 ```
 
 首次在空资料库启动时，会写入 13 段虚构录音、6 位联系人和 30 条待办（17 条未完成、13 条已完成），并复制演示音频。演示音频用 macOS 中文语音合成，内容纯属虚构。
@@ -137,20 +145,33 @@ DEMO_MODE=1 docker compose up -d --build
 docker compose down
 mv data data.backup
 mkdir data
-DEMO_MODE=1 docker compose up -d --build
+# 保持 DEMO_MODE=1
+docker compose up -d --force-recreate
 ```
 
 ## 配置
 
-所有配置都可以写在 `.env`，或作为 shell 环境变量传给 Compose。
+日常安装只需要改 `docker-compose.yml` 里的 `environment`：
+
+```yaml
+environment:
+  TZ: Asia/Shanghai
+  ADMIN_PASSWORD: "change-me"   # 必须改
+  DAV_USERNAME: audiowatch
+  DAV_PASSWORD: "change-me"     # 必须改
+  WHISPER_MODEL: small
+  DEMO_MODE: "0"
+```
+
+更多变量可在同一个 `environment` 下追加；源码构建方式则写在 `.env` 里。
 
 | 变量 | 默认 | 说明 |
 | --- | --- | --- |
-| `ADMIN_PASSWORD` | 自动生成 | WebUI 管理员密码 |
+| `ADMIN_PASSWORD` | 无 | WebUI 管理员密码；compose 中必须修改 |
 | `DAV_USERNAME` | `audiowatch` | 手机 WebDAV 账号 |
-| `DAV_PASSWORD` | 自动生成 | 手机 WebDAV 密码 |
-| `APP_PORT` | `3000` | 宿主机端口 |
-| `APP_BIND` | `0.0.0.0` | 监听地址；只用 Caddy 时设为 `127.0.0.1` |
+| `DAV_PASSWORD` | 无 | 手机 WebDAV 密码；compose 中必须修改 |
+| `APP_PORT` | `3000` | 宿主机端口；主 compose 直接写在 `ports` 里 |
+| `APP_BIND` | `0.0.0.0` | 仅源码构建文件使用；只用反代时可改 `127.0.0.1` |
 | `PUBLIC_URL` | 空 | 对外地址；用于“接入手机”页显示正确 URL |
 | `TZ` | `Asia/Shanghai` | 统计和“今天”的时区 |
 | `WHISPER_MODEL` | `small` | `base` / `small` / `medium` / `large-v3` |
@@ -304,9 +325,9 @@ docker项目/
 ├── tests/                后端测试
 ├── docs/                 架构说明、截图
 ├── Dockerfile
-├── docker-compose.yml        源码构建 / 本机开发
-├── docker-compose.fnos.yml   fnOS 预构建镜像（仅 3000）
-├── docker-compose.tls.yml    可选 Caddy 80/443
+├── docker-compose.yml        默认安装：拉取镜像，仅 3000
+├── docker-compose.build.yml  可选：源码构建
+├── docker-compose.tls.yml    可选：Caddy 80/443
 ├── .github/workflows/        GHCR 多架构镜像构建
 ├── Caddyfile
 ├── PRODUCT.md

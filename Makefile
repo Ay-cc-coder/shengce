@@ -1,19 +1,16 @@
-.PHONY: up down build logs seed test web dev
+.PHONY: up down build logs test web dev
 
 up:
-	docker compose up -d --build
+	docker compose up -d
 
 down:
 	docker compose down
 
 build:
-	docker compose build
+	docker compose -f docker-compose.build.yml build
 
 logs:
-	docker compose logs -f app
-
-seed:
-	SEED_DEMO=1 docker compose up -d --build
+	docker compose logs -f shengce
 
 test:
 	python3 -m pytest -q

@@ -1,6 +1,6 @@
 {$DOMAIN} {
 	encode zstd gzip
-	reverse_proxy app:8080 {
+	reverse_proxy shengce:8080 {
 		flush_interval -1
 	}
 }

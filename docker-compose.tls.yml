@@ -1,19 +1,15 @@
-# 可选：在 80/443 空闲的机器上，用 Caddy 自动申请证书。
-# 与 fnOS compose 叠加使用：
-#   docker compose -f docker-compose.fnos.yml -f docker-compose.tls.yml up -d
-# 如果 NAS 的 80/443 已被占用，请不要用这个文件，改用 fnOS 自带反代或已有 Nginx。
-name: shengce
-
+# 可选：仅当宿主机的 80/443 空闲时，用 Caddy 自动申请证书。
+#   docker compose -f docker-compose.yml -f docker-compose.tls.yml up -d
+# NAS 的 80/443 已被占用时不要使用本文件，改用现有反向代理。
 services:
   caddy:
     image: caddy:2.9
     container_name: shengce-caddy
     restart: unless-stopped
     depends_on:
-      app:
-        condition: service_healthy
+      - shengce
     environment:
-      DOMAIN: ${DOMAIN}
+      DOMAIN: "record.example.com"
     ports:
       - "80:80"
       - "443:443"

@@ -1,66 +1,22 @@
-name: shengce
-
+# 最简单、最常用的安装方式：拉取预构建镜像，只占用宿主机的 3000 端口。
+# 先修改下面的 ADMIN_PASSWORD / DAV_PASSWORD，再执行：
+#   docker compose up -d
 services:
-  app:
-    build:
-      context: .
-    image: shengce:local
+  shengce:
     container_name: shengce
+    image: ghcr.io/ay-cc-coder/shengce:latest
     restart: unless-stopped
-    env_file:
-      - path: .env
-        required: false
-    environment:
-      DATA_DIR: /data
-      TZ: ${TZ:-Asia/Shanghai}
-      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-}
-      DAV_USERNAME: ${DAV_USERNAME:-audiowatch}
-      DAV_PASSWORD: ${DAV_PASSWORD:-}
-      DEMO_MODE: ${DEMO_MODE:-0}
-      SEED_DEMO: ${SEED_DEMO:-0}
-      ASR_ENGINE: ${ASR_ENGINE:-faster}
-      WHISPER_MODEL: ${WHISPER_MODEL:-small}
-      WHISPER_LANGUAGE: ${WHISPER_LANGUAGE:-zh}
-      WHISPER_DEVICE: ${WHISPER_DEVICE:-cpu}
-      WHISPER_COMPUTE_TYPE: ${WHISPER_COMPUTE_TYPE:-int8}
-      WHISPER_PROMPT: ${WHISPER_PROMPT:-以下是普通话电话录音，请用简体中文转写。}
-      LLM_BASE_URL: ${LLM_BASE_URL:-https://api.deepseek.com/v1}
-      LLM_API_KEY: ${LLM_API_KEY:-}
-      LLM_MODEL: ${LLM_MODEL:-deepseek-chat}
-      MAX_UPLOAD_MB: ${MAX_UPLOAD_MB:-512}
-      SHOW_DAV_PASSWORD: ${SHOW_DAV_PASSWORD:-1}
-      SECURE_COOKIES: ${SECURE_COOKIES:-0}
-      START_WORKER: ${START_WORKER:-1}
-      PUBLIC_URL: ${PUBLIC_URL:-}
+
     ports:
-      - "${APP_BIND:-0.0.0.0}:${APP_PORT:-3000}:8080"
+      - "3000:8080"
+
     volumes:
       - ./data:/data
-    healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/api/health', timeout=4)"]
-      interval: 30s
-      timeout: 6s
-      start_period: 30s
-      retries: 3
 
-  caddy:
-    image: caddy:2.9
-    container_name: shengce-caddy
-    profiles: ["tls"]
-    restart: unless-stopped
-    depends_on:
-      app:
-        condition: service_healthy
     environment:
-      DOMAIN: ${DOMAIN}
-    ports:
-      - "80:80"
-      - "443:443"
-    volumes:
-      - ./Caddyfile:/etc/caddy/Caddyfile:ro
-      - caddy_data:/data
-      - caddy_config:/config
-
-volumes:
-  caddy_data:
-  caddy_config:
+      TZ: Asia/Shanghai
+      ADMIN_PASSWORD: "change-me"
+      DAV_USERNAME: audiowatch
+      DAV_PASSWORD: "change-me"
+      WHISPER_MODEL: small
+      DEMO_MODE: "0"

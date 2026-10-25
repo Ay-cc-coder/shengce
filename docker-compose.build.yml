@@ -1,0 +1,15 @@
+# 可选的源码构建方式；只有想自己编译镜像时才用。
+#   cp .env.example .env
+#   docker compose -f docker-compose.build.yml up -d --build
+services:
+  shengce:
+    build: .
+    image: shengce:local
+    container_name: shengce
+    restart: unless-stopped
+    env_file:
+      - .env
+    ports:
+      - "${APP_BIND:-0.0.0.0}:${APP_PORT:-3000}:8080"
+    volumes:
+      - ./data:/data
