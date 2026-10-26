@@ -101,6 +101,9 @@ export function RecordingsPage() {
     setReprocessingBad(true);
     try {
       const result = await api.post<{ queued: number }>("/api/recordings/reprocess-bad");
+      if (result.queued > 0) {
+        await api.post("/api/system/worker", { paused: false });
+      }
       toast.show(`已排队重新整理 ${result.queued} 条异常录音。`, "success");
       await badCount.reload();
       await reload();
