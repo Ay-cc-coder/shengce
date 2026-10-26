@@ -51,11 +51,7 @@ class Settings:
     )
     whisper_cpu_threads: int = field(default_factory=lambda: _int("WHISPER_CPU_THREADS", 2))
     whisper_language: str = field(default_factory=lambda: os.getenv("WHISPER_LANGUAGE", "zh"))
-    whisper_prompt: str = field(
-        default_factory=lambda: os.getenv(
-            "WHISPER_PROMPT", "以下是普通话电话录音，请用简体中文转写。"
-        )
-    )
+    whisper_prompt: str = field(default_factory=lambda: os.getenv("WHISPER_PROMPT", ""))
     asr_engine: str = field(default_factory=lambda: os.getenv("ASR_ENGINE", "faster"))
     asr_gpu_supported: bool = field(default_factory=lambda: _bool("ASR_GPU_SUPPORTED", False))
     llm_base_url: str = field(

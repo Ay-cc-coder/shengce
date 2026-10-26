@@ -85,6 +85,22 @@ def reset_model() -> None:
         _model_key = None
 
 
+PROMPT_LEAK_MARKERS = ("请用简体中文转写", "以下是普通话电话录音")
+
+
+def _looks_like_prompt(text: str, prompt: str | None) -> bool:
+    normalized = _clean_text(text).replace(" ", "")
+    if not normalized:
+        return False
+    if prompt:
+        prompt_normalized = _clean_text(prompt).replace(" ", "")
+        if prompt_normalized and (
+            normalized in prompt_normalized or prompt_normalized in normalized
+        ):
+            return True
+    return any(marker in normalized for marker in PROMPT_LEAK_MARKERS)
+
+
 def _fake_transcription(path: Path, settings: Settings) -> Transcription:
     candidates = [
         path.with_suffix(".transcript.json"),
@@ -147,8 +163,9 @@ def transcribe_audio(path: Path, settings: Settings) -> Transcription:
         vad_filter=True,
         vad_parameters={"min_silence_duration_ms": 480},
         beam_size=5,
-        temperature=0,
-        condition_on_previous_text=True,
+        compression_ratio_threshold=2.2,
+        no_speech_threshold=0.6,
+        condition_on_previous_text=False,
         word_timestamps=False,
     )
     segments: list[TranscriptSegment] = []
@@ -163,6 +180,17 @@ def transcribe_audio(path: Path, settings: Settings) -> Transcription:
                 text=text,
             )
         )
+    if segments:
+        leaked = sum(1 for segment in segments if _looks_like_prompt(segment.text, prompt))
+        if leaked / len(segments) >= 0.6:
+            logger.warning(
+                "discarding %s/%s segments that repeat the initial prompt",
+                leaked,
+                len(segments),
+            )
+            segments = [segment for segment in segments if not _looks_like_prompt(segment.text, prompt)]
+            if not segments:
+                raise RuntimeError("未检测到有效语音：模型重复了提示词，请重新整理或检查音频音量。")
     text = " ".join(segment.text for segment in segments)
     return Transcription(
         segments=segments,
