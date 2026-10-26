@@ -48,6 +48,7 @@ class Settings:
     whisper_compute_type: str = field(
         default_factory=lambda: os.getenv("WHISPER_COMPUTE_TYPE", "int8")
     )
+    whisper_cpu_threads: int = field(default_factory=lambda: _int("WHISPER_CPU_THREADS", 2))
     whisper_language: str = field(default_factory=lambda: os.getenv("WHISPER_LANGUAGE", "zh"))
     whisper_prompt: str = field(
         default_factory=lambda: os.getenv(

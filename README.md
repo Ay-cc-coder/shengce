@@ -178,6 +178,7 @@ environment:
 | `WHISPER_LANGUAGE` | `zh` | 转写语言 |
 | `WHISPER_DEVICE` | `cpu` | 有 CUDA 时可改 `cuda` 并自行给容器加 GPU |
 | `WHISPER_COMPUTE_TYPE` | `int8` | CPU 推荐 `int8`；GPU 可用 `float16` |
+| `WHISPER_CPU_THREADS` | `2` | CTranslate2 使用的 CPU 线程数；NAS 上别设太高 |
 | `WHISPER_PROMPT` | 简体中文提示 | 让模型优先输出简体中文，可留空 |
 | `ASR_ENGINE` | `faster` | `faster` 正常转写；`fake` 读取夹具，仅供开发 |
 | `LLM_BASE_URL` | `https://api.deepseek.com/v1` | OpenAI 兼容接口地址 |
@@ -185,6 +186,7 @@ environment:
 | `LLM_MODEL` | `deepseek-chat` | 模型名 |
 | `MAX_UPLOAD_MB` | `512` | 单文件上限 |
 | `DEMO_MODE` | `0` | 空库时写入演示数据 |
+| `START_WORKER` | `1` | 设为 `0` 暂停处理队列，保留 WebUI 和上传 |
 | `SHOW_DAV_PASSWORD` | `1` | “接入手机”页是否显示 WebDAV 密码 |
 | `SECURE_COOKIES` | `0` | 强制 Cookie 只走 HTTPS；反向代理已设置 `X-Forwarded-Proto` 时通常不用 |
 
@@ -205,6 +207,66 @@ LLM_MODEL=deepseek-chat
 ### 关于 Whisper
 
 默认 `small` + CPU `int8`，在普通小服务器上可用，但长录音会慢。中文电话录音如果追求更高质量，可换 `medium`；首次切换会重新下载模型。模型缓存在 `data/models/`，重启不会重复下载。
+
+## 资源占用、GPU 与 NAS 稳定性
+
+### 为什么默认只用 CPU
+
+当前镜像按 **CPU** 构建和运行：
+
+- `WHISPER_DEVICE` 默认是 `cpu`；
+- 容器没有挂载 GPU 设备，也没有 CUDA runtime；
+- CTranslate2 默认会尝试使用较多 CPU 线程，可能把 NAS 的 CPU 吃满；
+- Intel / AMD 核显（iGPU）不能直接被 faster-whisper 使用；
+- 只有 NVIDIA 独显 + 驱动 + NVIDIA Container Toolkit + CUDA 版镜像，才谈得上 GPU。当前镜像不是 CUDA 镜像，所以就算 NAS 有 NVIDIA 卡，仅设置 `WHISPER_DEVICE=cuda` 也不够。
+
+默认 `docker-compose.yml` 已经加了保护：
+
+```yaml
+cpus: "2.0"
+mem_limit: "3g"
+mem_reservation: "768m"
+pids_limit: 256
+environment:
+  WHISPER_CPU_THREADS: "2"
+  OMP_NUM_THREADS: "2"
+  MKL_NUM_THREADS: "2"
+  OPENBLAS_NUM_THREADS: "2"
+```
+
+`cpus` / `mem_limit` 是 Docker 的硬限制：超过内存时只会杀掉声册容器，而不是拖死整台 NAS。
+
+### NAS 已经卡死或死机过
+
+先别再让它自动处理：
+
+```bash
+docker compose stop shengce
+docker update --restart=no shengce
+```
+
+然后在 NAS 上检查：
+
+```bash
+docker inspect shengce --format '{{.State.OOMKilled}} {{.State.ExitCode}}'
+dmesg -T | grep -i -E 'oom|killed process' | tail -30
+free -h
+df -h
+docker stats --no-stream
+```
+
+如果 `OOMKilled=true`，或内核日志出现 `Out of memory: Killed process`，基本就是内存被吃满。
+
+### 怎么降负载
+
+1. 先把 `START_WORKER` 设为 `"0"`，重启容器；此时 WebUI 和上传正常，但不转写。
+2. 把 `WHISPER_MODEL` 从 `small` 换成 `base`，再考虑恢复；`medium` 只在性能足够的机器上用。
+3. 把 `WHISPER_CPU_THREADS`、`OMP_NUM_THREADS` 调到 `1` 或 `2`。
+4. 把 `mem_limit` 调低（例如 2g），确认模型还能加载；如果 OOM，换 `base`。
+5. 大量历史文件分批导入，别一次把几千小时音频丢进队列。
+6. 稳定后再把 `START_WORKER` 改回 `"1"`。
+
+不要用关闭 swap 或无限增加 swap 来“解决”内存问题；优先限制容器和降低模型。
 
 ## 文件与处理规则
 

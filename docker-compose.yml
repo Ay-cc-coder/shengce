@@ -19,4 +19,21 @@ services:
       DAV_USERNAME: audiowatch
       DAV_PASSWORD: "change-me"
       WHISPER_MODEL: small
+      WHISPER_CPU_THREADS: "2"
+      OMP_NUM_THREADS: "2"
+      MKL_NUM_THREADS: "2"
+      OPENBLAS_NUM_THREADS: "2"
+      START_WORKER: "1"
       DEMO_MODE: "0"
+
+    # 防止转写把 NAS 的 CPU/内存吃满。按你的 NAS 配置调整。
+    cpus: "2.0"
+    mem_limit: "3g"
+    mem_reservation: "768m"
+    pids_limit: 256
+    stop_grace_period: 30s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"

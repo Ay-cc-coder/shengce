@@ -13,3 +13,13 @@ services:
       - "${APP_BIND:-0.0.0.0}:${APP_PORT:-3000}:8080"
     volumes:
       - ./data:/data
+    cpus: "2.0"
+    mem_limit: "3g"
+    mem_reservation: "768m"
+    pids_limit: 256
+    stop_grace_period: 30s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"

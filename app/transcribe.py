@@ -13,7 +13,7 @@ logger = logging.getLogger(__name__)
 
 _model = None
 _model_lock = threading.Lock()
-_model_key: tuple[str, str, str] | None = None
+_model_key: tuple[str, str, str, int] | None = None
 
 
 @dataclass
@@ -46,22 +46,30 @@ def _clean_text(text: str) -> str:
 
 def _load_model(settings: Settings):
     global _model, _model_key
-    key = (settings.whisper_model, settings.whisper_device, settings.whisper_compute_type)
+    key = (
+        settings.whisper_model,
+        settings.whisper_device,
+        settings.whisper_compute_type,
+        settings.whisper_cpu_threads,
+    )
     with _model_lock:
         if _model is not None and _model_key == key:
             return _model
         from faster_whisper import WhisperModel
 
         logger.info(
-            "loading whisper model %s (%s/%s)",
+            "loading whisper model %s (%s/%s, %s threads)",
             settings.whisper_model,
             settings.whisper_device,
             settings.whisper_compute_type,
+            settings.whisper_cpu_threads,
         )
         _model = WhisperModel(
             settings.whisper_model,
             device=settings.whisper_device,
             compute_type=settings.whisper_compute_type,
+            cpu_threads=max(1, settings.whisper_cpu_threads),
+            num_workers=1,
             download_root=str(settings.data_dir / "models"),
         )
         _model_key = key
