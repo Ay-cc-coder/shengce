@@ -1,7 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
-import { ArrowRight, Waveform as WaveformIcon } from "@phosphor-icons/react";
+import { ArrowRight, ArrowsClockwise, WarningCircle, Waveform as WaveformIcon } from "@phosphor-icons/react";
 import { Link, useSearchParams } from "react-router-dom";
+import { api } from "../lib/api";
 import { useApi, useDebounced, useRefreshEvent } from "../lib/hooks";
+import { useToast } from "../contexts";
 import type { Paged, RecordingSummary } from "../types";
 import { cx, dateKey, formatDayHeading } from "../lib/format";
 import {
@@ -17,26 +19,31 @@ export function RecordingsPage() {
   const [params, setParams] = useSearchParams();
   const contactId = params.get("contact") || "";
   const contactName = params.get("contactName") || "";
+  const quality = params.get("quality") || "";
+  const toast = useToast();
   const [category, setCategory] = useState("");
   const [query, setQuery] = useState("");
   const debouncedQuery = useDebounced(query, 280);
   const [page, setPage] = useState(1);
   const [items, setItems] = useState<RecordingSummary[]>([]);
+  const [reprocessingBad, setReprocessingBad] = useState(false);
 
   const path = useMemo(() => {
     const search = new URLSearchParams();
     search.set("page", String(page));
     search.set("page_size", "20");
     if (category) search.set("category", category);
+    if (quality === "bad") search.set("quality", "bad");
     if (contactId) search.set("contact_id", contactId);
     if (debouncedQuery.trim()) search.set("q", debouncedQuery.trim());
     return `/api/recordings?${search.toString()}`;
-  }, [page, category, contactId, debouncedQuery]);
+  }, [page, category, quality, contactId, debouncedQuery]);
 
   const { data, loading, error, reload } = useApi<Paged<RecordingSummary>>(path, {
     pollMs: 12000,
   });
   useRefreshEvent(reload);
+  const badCount = useApi<{ count: number }>("/api/recordings/bad/count", { pollMs: 12000 });
 
   useEffect(() => {
     document.title = "录音 · 声册";
@@ -45,7 +52,7 @@ export function RecordingsPage() {
   useEffect(() => {
     setPage(1);
     setItems([]);
-  }, [category, contactId, debouncedQuery]);
+  }, [category, quality, contactId, debouncedQuery]);
 
   useEffect(() => {
     if (!data) return;
@@ -73,6 +80,35 @@ export function RecordingsPage() {
     // hides matching calls (e.g. searching 老妈 while 语音备忘 is selected).
     if (value.trim() && category) {
       setCategory("");
+    }
+  };
+
+  const toggleBadFilter = () => {
+    const next = new URLSearchParams(params);
+    if (quality === "bad") {
+      next.delete("quality");
+    } else {
+      next.set("quality", "bad");
+      next.delete("category");
+      setCategory("");
+    }
+    setParams(next, { replace: true });
+    setPage(1);
+    setItems([]);
+  };
+
+  const reprocessBad = async () => {
+    setReprocessingBad(true);
+    try {
+      const result = await api.post<{ queued: number }>("/api/recordings/reprocess-bad");
+      toast.show(`已排队重新整理 ${result.queued} 条异常录音。`, "success");
+      await badCount.reload();
+      await reload();
+      window.dispatchEvent(new Event("shengce:refresh"));
+    } catch (err) {
+      toast.show(err instanceof Error ? err.message : "重新整理失败。", "error");
+    } finally {
+      setReprocessingBad(false);
     }
   };
 
@@ -133,6 +169,34 @@ export function RecordingsPage() {
           </button>
         ) : null}
       </div>
+
+      {quality === "bad" || (badCount.data?.count ?? 0) > 0 ? (
+        <div className="notice notice--warning recordings-bad">
+          <WarningCircle size={20} aria-hidden="true" />
+          <div className="recordings-bad__body">
+            <strong>
+              {(badCount.data?.count ?? 0) > 0
+                ? `发现 ${badCount.data?.count} 条转写异常`
+                : "没有等待重新整理的异常录音"}
+            </strong>
+            <p>包括“请用简体中文转写”复读、空转写或提示词残留。可换好模型后一键重新整理。</p>
+          </div>
+          <div className="recordings-bad__actions">
+            <button type="button" className="btn btn--ghost btn--small" onClick={toggleBadFilter}>
+              {quality === "bad" ? "查看全部" : "只看异常"}
+            </button>
+            <button
+              type="button"
+              className="btn btn--primary btn--small"
+              onClick={() => void reprocessBad()}
+              disabled={reprocessingBad || (badCount.data?.count ?? 0) === 0}
+            >
+              <ArrowsClockwise size={14} aria-hidden="true" />
+              {reprocessingBad ? "排队中" : "一键重新整理"}
+            </button>
+          </div>
+        </div>
+      ) : null}
 
       {error ? (
         <EmptyState

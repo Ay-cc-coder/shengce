@@ -8,7 +8,7 @@ from datetime import timedelta
 from fastapi import APIRouter, HTTPException, Query, Request
 from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
-from sqlalchemy import func, or_, select
+from sqlalchemy import and_, func, or_, select
 from sqlalchemy.orm import selectinload
 
 from ..ingest import create_contact, queue_reprocess
@@ -49,12 +49,31 @@ def _load(request: Request, file_id: str) -> FileRecord:
     return record
 
 
+BAD_TRANSCRIPT_MARKERS = (
+    "请用简体中文转写",
+    "请输入中文",
+    "以下是普通话电话录音",
+)
+
+
+def _bad_transcript_condition():
+    return and_(
+        FileRecord.status == "ready",
+        FileRecord.kind.in_(AUDIO_KINDS),
+        or_(
+            func.length(func.trim(FileRecord.transcript_text)) == 0,
+            *[FileRecord.transcript_text.contains(marker) for marker in BAD_TRANSCRIPT_MARKERS],
+        ),
+    )
+
+
 @router.get("")
 def list_recordings(
     request: Request,
     q: str = Query("", max_length=200),
     kind: str = Query("", max_length=40),
     category: str = Query("", max_length=40),
+    quality: str = Query("", max_length=20),
     status: str = Query("", max_length=20),
     contact_id: str = Query("", max_length=40),
     days: int = Query(0, ge=0, le=3650),
@@ -73,6 +92,8 @@ def list_recordings(
             conditions.append(FileRecord.kind == kind)
     if category:
         conditions.append(FileRecord.category == category)
+    if quality == "bad":
+        conditions.append(_bad_transcript_condition())
     if status:
         conditions.append(FileRecord.status == status)
     if contact_id:
@@ -124,6 +145,27 @@ def list_recordings(
         "page_size": page_size,
         "pages": max(1, (total + page_size - 1) // page_size),
     }
+
+
+@router.get("/bad/count")
+def bad_recording_count(request: Request) -> dict:
+    db = _db(request)
+    with db.session() as session:
+        count = session.scalar(
+            select(func.count()).select_from(FileRecord).where(_bad_transcript_condition())
+        ) or 0
+    return {"count": count}
+
+
+@router.post("/reprocess-bad")
+def reprocess_bad_recordings(request: Request) -> dict:
+    db = _db(request)
+    with db.session() as session:
+        ids = session.scalars(
+            select(FileRecord.id).where(_bad_transcript_condition()).order_by(FileRecord.uploaded_at.asc())
+        ).all()
+    queued = sum(1 for file_id in ids if queue_reprocess(db, file_id))
+    return {"queued": queued}
 
 
 @router.get("/{file_id}")

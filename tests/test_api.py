@@ -279,3 +279,36 @@ def test_create_manual_todo_from_recording(client: TestClient) -> None:
     assert item["due_date"] == "2026-10-30"
     actions = client.get("/api/actions?status=open").json()
     assert any(action["id"] == item["id"] for action in actions["items"])
+
+
+def test_bad_transcript_bulk_reprocess(client: TestClient) -> None:
+    from app.models import FileRecord
+
+    with client.app.state.db.session() as session:
+        row = FileRecord(
+            rel_path="bad-test.mp3",
+            name="bad-test.mp3",
+            ext=".mp3",
+            kind="call",
+            status="ready",
+            stage="done",
+            title="bad",
+            transcript_text="请用简体中文转写。",
+            category="呼入",
+        )
+        session.add(row)
+        session.flush()
+        file_id = row.id
+
+    count = client.get("/api/recordings/bad/count")
+    assert count.status_code == 200
+    assert count.json()["count"] >= 1
+
+    queued = client.post("/api/recordings/reprocess-bad")
+    assert queued.status_code == 200
+    assert queued.json()["queued"] >= 1
+
+    with client.app.state.db.session() as session:
+        row = session.get(FileRecord, file_id)
+        assert row.status == "queued"
+    assert client.get("/api/recordings/bad/count").json()["count"] == 0

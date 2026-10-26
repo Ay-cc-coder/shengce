@@ -11,7 +11,7 @@ from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
 
 from .db import Database
-from .models import ActionItem, ClassificationRule, Contact, FileRecord, Segment, utcnow
+from .models import ClassificationRule, Contact, FileRecord, Segment, utcnow
 from .utils import (
     KIND_CATEGORY,
     is_probe_file,
@@ -300,7 +300,7 @@ def apply_rules_to_existing(db: Database) -> int:
 
 def _reset_analysis(session: Session, record: FileRecord) -> None:
     session.execute(delete(Segment).where(Segment.file_id == record.id))
-    session.execute(delete(ActionItem).where(ActionItem.file_id == record.id))
+    # Keep user-created todos when only re-running ASR/analysis.
     record.title = None
     record.summary = None
     record.key_points = []
@@ -316,7 +316,6 @@ def _reset_analysis(session: Session, record: FileRecord) -> None:
     record.waveform = []
     record.processed_at = None
     record.error = None
-    record.contact_id = None
     record.status = "queued"
     record.stage = "waiting"
 

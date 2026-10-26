@@ -2277,3 +2277,40 @@ a.file-row__title:hover {
     opacity: 1;
   }
 }
+
+.recordings-bad {
+  align-items: center;
+}
+
+.recordings-bad__body {
+  flex: 1;
+  min-width: 0;
+}
+
+.recordings-bad__body p {
+  margin-top: 3px;
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.recordings-bad__actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  flex: none;
+}
+
+@media (max-width: 760px) {
+  .recordings-bad {
+    align-items: flex-start;
+    flex-wrap: wrap;
+  }
+
+  .recordings-bad__body {
+    flex-basis: calc(100% - 30px);
+  }
+
+  .recordings-bad__actions {
+    margin-left: 30px;
+  }
+}

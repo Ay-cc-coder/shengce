@@ -13,7 +13,7 @@ from .analysis import Analysis, analyse_local
 from .config import Settings
 from .conversation import build_conversation
 from .db import Database
-from .ingest import apply_document_metadata
+from .ingest import apply_document_metadata, apply_structured_naming
 from .llm import analyse_with_llm
 from .media import analyse_audio
 from .models import Contact, FileRecord, Segment, utcnow
@@ -370,6 +370,7 @@ def _process_audio(
             record.speakers = {"1": "说话人 1"}
         else:
             record.speakers = {"1": "说话人 1", "2": "说话人 2"}
+        apply_structured_naming(session, record)
         # Todos are created explicitly by the user from transcript text.
         record.status = "ready"
         record.stage = "done"
