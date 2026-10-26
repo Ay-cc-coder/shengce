@@ -243,3 +243,18 @@ def test_structured_call_naming() -> None:
     assert outgoing["device"] == "微信"
     assert outgoing["contact"] == "赵天赐"
     assert outgoing["title"].startswith("呼出-微信-赵天赐-2026-10-23-")
+
+
+def test_nickname_contact_fallback() -> None:
+    from datetime import date
+
+    from app.ingest import structured_fields
+
+    fields = structured_fields(
+        "微信来电-何以言辞🫶❤️❤️(wxid_r9pt7py7i9jh22)[10-27_06-18-43].mp3",
+        "call",
+        date(2026, 10, 27),
+        None,
+    )
+    assert fields["contact"] == "何以言辞"
+    assert fields["title"] == "呼入-微信-何以言辞-2026-10-27-通话录音"

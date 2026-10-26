@@ -13,6 +13,7 @@ from fastapi.responses import FileResponse, JSONResponse
 from starlette.middleware.base import BaseHTTPMiddleware
 
 from . import __version__
+from .ai_classify import cleanup_rules
 from .ai_config import load_ai_config
 from .auth import COOKIE_NAME, LoginLimiter, verify_session
 from .config import Settings, load_settings
@@ -89,6 +90,7 @@ async def lifespan(app: FastAPI):
     db = init_database(settings.db_path)
     app.state.db = db
     app.state.limiter = LoginLimiter()
+    cleanup_rules(app.state.db)
     runtime = load_runtime(settings)
     app.state.ai_provider = load_ai_config(settings).get("provider", "custom")
     logger.info(

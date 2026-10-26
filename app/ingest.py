@@ -62,6 +62,16 @@ def _contact_from_filename(name: str) -> str | None:
             continue
         if value:
             return value
+    head = re.split(r"[（(]", name)[0]
+    cleaned = STRUCT_ID_RE.sub(" ", head)
+    cleaned = STRUCT_DATE_RE.sub(" ", cleaned)
+    for token in ("CallKit音频", "CallKit", "微信视频", "微信", "语音", "来电", "呼入", "呼出", "拨出", "小1", "小2", "普通通话", "通话录音", "音频", "录音"):
+        cleaned = cleaned.replace(token, " ")
+    cleaned = re.sub(r"[^\u4e00-\u9fff·]+", " ", cleaned)
+    for candidate in re.findall(r"[\u4e00-\u9fff·]{2,6}", cleaned):
+        if candidate in GENERIC_CONTACTS or any(token in candidate for token in ("对方", "通话", "语音", "视频")):
+            continue
+        return candidate
     return None
 
 

@@ -24,7 +24,7 @@ SYSTEM_PROMPT = """你是一个录音文件命名分类助手。用户会给出�
 联系人姓名、日期、详细内容都是每个文件不同的变量，不能固化在规则里。
 
 要求：
-1. match 必须是文件名中稳定出现的短子串，1-24 个字符；不要包含日期、UUID、随机数字、联系人姓名或 wxid。
+1. match 必须是文件名中稳定出现的短子串，1-24 个字符；不要包含日期、UUID、随机数字、联系人姓名或 wxid；末尾不要带 -、_ 或空格。
 2. direction 只能是：呼入、呼出、未知。文件名有“来电/呼入”就是呼入，有“呼出/拨出”就是呼出；CallKit 音频通常按呼入。
 3. device 是拨打的设备/平台：移动、联通、电信、CallKit、微信、微信视频、小1、小2、FaceTime、电话等；用文件名里真实出现的。
 4. kind 只能是 call、voice、audio、document、image、video、archive、other。
@@ -165,7 +165,7 @@ def _validated_rules(payload: dict[str, Any]) -> list[dict[str, Any]]:
     for item in raw:
         if not isinstance(item, dict):
             continue
-        match = str(item.get("match") or "").strip()
+        match = str(item.get("match") or "").strip().rstrip("-_ ")
         if not (1 <= len(match) <= 24) or match in seen:
             continue
         kind = str(item.get("kind") or "").strip().lower()
@@ -255,7 +255,42 @@ def generate_rules(db: Database, settings: Settings) -> dict[str, Any]:
             existing.contact = rule["contact"]
             existing.enabled = True
             existing.source = "ai"
+    cleanup_rules(db)
     return {"rules": list_rules(db), "sample_count": len(unique), "generated": len(rules)}
+
+
+def _normalized_match(value: str) -> str:
+    return value.strip().rstrip("-_ ")
+
+
+def cleanup_rules(db: Database) -> int:
+    """Merge rules that differ only by trailing separators."""
+    removed = 0
+    with db.session() as session:
+        rows = session.scalars(
+            select(ClassificationRule).order_by(ClassificationRule.created_at.asc())
+        ).all()
+        groups: dict[str, list[ClassificationRule]] = {}
+        for row in rows:
+            groups.setdefault(_normalized_match(row.match), []).append(row)
+        for normalized, items in groups.items():
+            if len(items) == 1 and items[0].match == normalized:
+                continue
+            items.sort(
+                key=lambda row: (
+                    bool(row.direction),
+                    bool(row.device),
+                    bool(row.title_template),
+                    bool(row.category),
+                ),
+                reverse=True,
+            )
+            keep = items[0]
+            for duplicate in items[1:]:
+                session.delete(duplicate)
+                removed += 1
+            keep.match = normalized
+    return removed
 
 
 def list_rules(db: Database) -> list[dict[str, Any]]:
@@ -293,6 +328,7 @@ def delete_rule(db: Database, rule_id: str) -> bool:
 
 
 def apply_rules(db: Database) -> int:
+    cleanup_rules(db)
     return apply_rules_to_existing(db)
 
 
