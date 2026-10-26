@@ -10,8 +10,8 @@ services:
       WHISPER_DEVICE: cuda
       WHISPER_COMPUTE_TYPE: float16
       WHISPER_CPU_THREADS: "4"
-      GPU_TEMP_PAUSE: "86"
-      GPU_TEMP_RESUME: "80"
+      GPU_TEMP_PAUSE: "78"
+      GPU_TEMP_RESUME: "70"
       WHISPER_MODEL: small
       START_WORKER: "1"
     cpus: "4.0"

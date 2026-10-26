@@ -187,7 +187,10 @@ def nvidia_gpus() -> tuple[list[dict[str, Any]], str | None]:
             return [dict(item) for item in _gpu_cache], "nvidia-smi 暂时返回错误，显示最近一次结果"
         return [], "nvidia-smi 返回错误，容器可能没有 GPU 访问权限"
     gpus: list[dict[str, Any]] = []
-    for row in csv.reader(io.StringIO(result.stdout)):
+    rows = list(csv.reader(io.StringIO(result.stdout)))
+    if not rows:
+        return [], "nvidia-smi 没有返回显卡（可能掉卡或驱动异常）"
+    for row in rows:
         if len(row) < 7:
             continue
         try:
@@ -252,18 +255,7 @@ def system_payload(
     gpus, gpu_error = nvidia_gpus()
     cuda_count = cuda_device_count()
     if not gpus and cuda_count > 0:
-        gpus = [
-            {
-                "index": 0,
-                "name": "NVIDIA GPU",
-                "memory_total_mb": 0,
-                "memory_used_mb": 0,
-                "utilization_percent": 0,
-                "temperature_c": 0,
-                "driver_version": "unknown",
-            }
-        ]
-        gpu_error = "nvidia-smi 不可用，但 CUDA 设备可用"
+        gpu_error = gpu_error or "没有找到可用的 NVIDIA GPU（可能掉卡或驱动异常）"
     gpu_supported = bool(settings.asr_gpu_supported and cuda_count > 0 and gpus)
     return {
         "asr": {

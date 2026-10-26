@@ -21,8 +21,8 @@ services:
       DAV_PASSWORD: "change-me"
       WHISPER_MODEL: small
       WHISPER_CPU_THREADS: "2"
-      GPU_TEMP_PAUSE: "86"
-      GPU_TEMP_RESUME: "80"
+      GPU_TEMP_PAUSE: "78"
+      GPU_TEMP_RESUME: "70"
       OMP_NUM_THREADS: "2"
       MKL_NUM_THREADS: "2"
       OPENBLAS_NUM_THREADS: "2"
