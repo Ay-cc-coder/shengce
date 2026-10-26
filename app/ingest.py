@@ -45,6 +45,8 @@ def create_contact(session: Session, name: str, phone: str | None = None) -> Con
 
 
 PAREN_CONTACT_RE = re.compile(r"[（(]\s*([\u4e00-\u9fff·]{2,4})\s*[）)]")
+CONTROL_RE = re.compile(r"[\u200e\u200f\u202a-\u202e\u2066-\u2069]")
+GENERIC_CONTACTS = {"来电", "呼出", "呼入", "通话", "通话录音", "未识别联系人", "未知来电"}
 STRUCT_ID_RE = re.compile(r"\{[^}]*\}|\[[^\]]*\]")
 STRUCT_DATE_RE = re.compile(
     r"(20\d{2})[-_.年]?(\d{1,2})[-_.月]?(\d{1,2})|\d{2,4}[-_.]\d{1,2}[-_.]\d{1,2}"
@@ -52,6 +54,7 @@ STRUCT_DATE_RE = re.compile(
 
 
 def _contact_from_filename(name: str) -> str | None:
+    name = CONTROL_RE.sub("", name)
     for match in PAREN_CONTACT_RE.finditer(name):
         value = match.group(1).strip(" -_.")
         if value in {"未知来电", "未知号码", "陌生人", "未接来电", "通话录音"}:
@@ -81,10 +84,6 @@ def _device_from_name(name: str) -> str:
 
 
 def _direction_from_name(name: str, kind: str) -> str:
-    if kind == "voice":
-        return "语音备忘"
-    if kind == "audio":
-        return "音频"
     lower = name.lower()
     if any(token in name for token in ("呼出", "拨出")) or any(
         token in lower for token in ("outgoing", "dial")
@@ -94,14 +93,18 @@ def _direction_from_name(name: str, kind: str) -> str:
         token in lower for token in ("incoming", "callkit")
     ):
         return "呼入"
+    if kind == "voice":
+        return "语音备忘"
+    if kind == "audio":
+        return "音频"
     return "通话"
 
 
 def _structured_detail(name: str, device: str, contact: str | None) -> str:
-    stem = Path(name).stem
+    stem = CONTROL_RE.sub("", Path(name).stem)
     cleaned = STRUCT_ID_RE.sub(" ", stem)
     cleaned = STRUCT_DATE_RE.sub(" ", cleaned)
-    for token in (device, "CallKit音频", "CallKit", "微信视频", "微信", "小1", "小2", "呼出", "拨出", "来电", "呼入", "普通通话", "与对方的通话", "通话录音"):
+    for token in (device, "CallKit音频", "CallKit", "微信视频", "微信", "小1", "小2", "呼出", "拨出", "来电", "呼入", "普通通话", "与对方的通话", "通话录音", "音频"):
         cleaned = cleaned.replace(token, " ")
     if contact:
         cleaned = cleaned.replace(contact, " ")
@@ -115,6 +118,9 @@ def _structured_detail(name: str, device: str, contact: str | None) -> str:
 def structured_fields(name: str, kind: str, recorded_at, contact_name: str | None) -> dict[str, str | None]:
     if kind not in {"call", "voice", "audio"}:
         return {}
+    name = CONTROL_RE.sub("", name)
+    if contact_name in GENERIC_CONTACTS:
+        contact_name = None
     direction = _direction_from_name(name, kind)
     device = _device_from_name(name)
     contact = contact_name or _contact_from_filename(name)
@@ -136,10 +142,15 @@ def apply_structured_naming(session: Session, record: FileRecord) -> bool:
     if record.contact_id:
         contact = session.get(Contact, record.contact_id)
         contact_name = contact.name if contact else None
+    if contact_name in GENERIC_CONTACTS:
+        contact_name = None
+        record.contact_id = None
     fields = structured_fields(record.name, record.kind, record.recorded_at, contact_name)
     if not fields:
         return False
     before = (record.title, record.category, record.contact_id)
+    if fields["direction"] in {"呼入", "呼出"} and record.kind == "audio":
+        record.kind = "call"
     if fields["contact"] and not record.contact_id:
         contact = create_contact(session, str(fields["contact"]))
         record.contact_id = contact.id
