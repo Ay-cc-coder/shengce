@@ -175,7 +175,7 @@ environment:
 | `APP_BIND` | `0.0.0.0` | 仅源码构建文件使用；只用反代时可改 `127.0.0.1` |
 | `PUBLIC_URL` | 空 | 对外地址；用于“接入手机”页显示正确 URL |
 | `TZ` | `Asia/Shanghai` | 统计和“今天”的时区 |
-| `WHISPER_MODEL` | `small` | `base` / `small` / `medium` / `large-v3` |
+| `WHISPER_MODEL` | `small` | `base` / `small` / `medium` / `large-v3` / `large-v3-turbo` |
 | `WHISPER_LANGUAGE` | `zh` | 转写语言 |
 | `WHISPER_DEVICE` | `cpu` | 使用 GPU 时由 `docker-compose.gpu.yml` 设为 `cuda` |
 | `WHISPER_DEVICE_INDEX` | `0` | 多卡时选择第几张 NVIDIA 卡 |

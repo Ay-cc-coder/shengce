@@ -18,7 +18,7 @@ import type { SystemInfo } from "../types";
 import { cx, formatBytes } from "../lib/format";
 import { EmptyState, PageHead, SkeletonRows, Tag } from "../components/ui";
 
-const MODELS = ["base", "small", "medium", "large-v3"];
+const MODELS = ["base", "small", "medium", "large-v3", "large-v3-turbo"];
 
 function Meter({
   label,

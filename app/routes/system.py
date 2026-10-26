@@ -11,7 +11,7 @@ from ..transcribe import reset_model
 
 router = APIRouter(prefix="/api/system", tags=["system"])
 
-ALLOWED_MODELS = {"base", "small", "medium", "large-v3"}
+ALLOWED_MODELS = {"base", "small", "medium", "large-v3", "large-v3-turbo"}
 
 
 def _payload(request: Request) -> dict:
