@@ -206,5 +206,11 @@ def test_ai_base_url_normalization() -> None:
         "https://ai.superdoor.top/v1",
         "https://ai.superdoor.top",
     ]
-    assert _api_bases("https://api.deepseek.com/v1/") == ["https://api.deepseek.com/v1"]
-    assert _api_bases("http://192.168.5.221:11434/v1") == ["http://192.168.5.221:11434/v1"]
+    assert _api_bases("https://api.deepseek.com/v1/") == [
+        "https://api.deepseek.com/v1",
+        "https://api.deepseek.com",
+    ]
+    assert _api_bases("http://192.168.5.221:11434/v1") == [
+        "http://192.168.5.221:11434/v1",
+        "http://192.168.5.221:11434",
+    ]

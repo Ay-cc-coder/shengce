@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   ArrowClockwise,
   CheckCircle,
@@ -61,6 +61,7 @@ export function AiPage() {
   const [models, setModels] = useState<string[]>([]);
   const [manualModel, setManualModel] = useState(false);
   const [initialized, setInitialized] = useState(false);
+  const modelsLoaded = useRef(false);
 
   useEffect(() => {
     document.title = "AI 分类 · 声册";
@@ -73,6 +74,34 @@ export function AiPage() {
     setModel(configApi.data.model);
     setInitialized(true);
   }, [configApi.data, initialized]);
+
+  const loadModels = async (showError = false): Promise<string[]> => {
+    setFetchingModels(true);
+    try {
+      const result = await api.get<{ models: string[] }>("/api/ai/models");
+      setModels(result.models);
+      modelsLoaded.current = true;
+      setManualModel(false);
+      if (result.models.length && !result.models.includes(model)) {
+        setModel(result.models[0]);
+      }
+      return result.models;
+    } catch (err) {
+      if (showError) {
+        toast.show(err instanceof Error ? err.message : "获取模型失败。", "error");
+      }
+      return [];
+    } finally {
+      setFetchingModels(false);
+    }
+  };
+
+  useEffect(() => {
+    if (configApi.data?.has_key && !modelsLoaded.current) {
+      modelsLoaded.current = true;
+      void loadModels(false);
+    }
+  }, [configApi.data?.has_key]);
 
   const chooseProvider = (id: string) => {
     setProvider(id);
@@ -105,21 +134,11 @@ export function AiPage() {
   };
 
   const fetchModels = async () => {
-    setFetchingModels(true);
-    try {
-      const saved = await saveConfig();
-      if (!saved) return;
-      const result = await api.get<{ models: string[] }>("/api/ai/models");
-      setModels(result.models);
-      setManualModel(false);
-      if (result.models.length && !result.models.includes(model)) {
-        setModel(result.models[0]);
-      }
-      toast.show(`获取到 ${result.models.length} 个模型。`, "success");
-    } catch (err) {
-      toast.show(err instanceof Error ? err.message : "获取模型失败。", "error");
-    } finally {
-      setFetchingModels(false);
+    const saved = await saveConfig();
+    if (!saved) return;
+    const fetched = await loadModels(true);
+    if (fetched.length) {
+      toast.show(`获取到 ${fetched.length} 个模型。`, "success");
     }
   };
 

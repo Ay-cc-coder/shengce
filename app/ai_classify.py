@@ -47,6 +47,8 @@ def _api_bases(base_url: str) -> list[str]:
     path = "/" + parsed.split("/", 1)[1] if "/" in parsed else ""
     if path in {"", "/"}:
         candidates = [base + "/v1", base]
+    elif path.rstrip("/").endswith("/v1"):
+        candidates.append(base[: -len("/v1")].rstrip("/"))
     output: list[str] = []
     for item in candidates:
         if item not in output:
@@ -105,10 +107,9 @@ def list_models(settings: Settings) -> list[str]:
     last_error: Exception | None = None
     endpoints: list[str] = []
     for base in _api_bases(settings.llm_base_url):
-        for suffix in ("/models", "/v1/models"):
-            url = base + suffix
-            if url not in endpoints:
-                endpoints.append(url)
+        url = base + "/models"
+        if url not in endpoints:
+            endpoints.append(url)
     with httpx.Client(timeout=min(settings.llm_timeout, 30)) as client:
         for url in endpoints:
             try:
