@@ -6,6 +6,7 @@ services:
     container_name: shengce
     image: ghcr.io/ay-cc-coder/shengce:latest
     restart: unless-stopped
+    init: true
 
     ports:
       - "3000:8080"
@@ -20,6 +21,8 @@ services:
       DAV_PASSWORD: "change-me"
       WHISPER_MODEL: small
       WHISPER_CPU_THREADS: "2"
+      GPU_TEMP_PAUSE: "86"
+      GPU_TEMP_RESUME: "80"
       OMP_NUM_THREADS: "2"
       MKL_NUM_THREADS: "2"
       OPENBLAS_NUM_THREADS: "2"

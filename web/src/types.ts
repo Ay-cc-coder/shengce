@@ -228,6 +228,17 @@ export interface SystemInfo {
     failed: number;
     current: { id: string; title: string; name: string; stage: string } | null;
   };
-  worker: { paused: boolean; enabled: boolean };
+  worker: {
+    paused: boolean;
+    guard_paused: boolean;
+    temperature: number | null;
+    enabled: boolean;
+  };
+  thermal: {
+    enabled: boolean;
+    pause_c: number;
+    resume_c: number;
+    temperature_c: number | null;
+  };
   timestamp: string;
 }

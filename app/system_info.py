@@ -283,12 +283,21 @@ def system_payload(
         "queue": queue_info(db),
         "worker": {
             "paused": bool(worker.is_paused()) if worker else False,
+            "guard_paused": bool(worker.is_guard_paused()) if worker else False,
+            "temperature": worker.guard_temperature if worker else None,
             "enabled": bool(
                 worker
                 and worker.thread
                 and worker.thread.is_alive()
                 and not worker.is_paused()
+                and not worker.is_guard_paused()
             ),
+        },
+        "thermal": {
+            "enabled": settings.whisper_device == "cuda",
+            "pause_c": settings.gpu_temp_pause,
+            "resume_c": settings.gpu_temp_resume,
+            "temperature_c": gpus[0].get("temperature_c") if gpus else None,
         },
         "timestamp": iso_utc(utcnow()),
     }

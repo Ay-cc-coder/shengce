@@ -54,6 +54,8 @@ class Settings:
     whisper_prompt: str = field(default_factory=lambda: os.getenv("WHISPER_PROMPT", ""))
     asr_engine: str = field(default_factory=lambda: os.getenv("ASR_ENGINE", "faster"))
     asr_gpu_supported: bool = field(default_factory=lambda: _bool("ASR_GPU_SUPPORTED", False))
+    gpu_temp_pause: int = field(default_factory=lambda: _int("GPU_TEMP_PAUSE", 86))
+    gpu_temp_resume: int = field(default_factory=lambda: _int("GPU_TEMP_RESUME", 80))
     llm_base_url: str = field(
         default_factory=lambda: os.getenv("LLM_BASE_URL", "https://api.deepseek.com/v1")
     )

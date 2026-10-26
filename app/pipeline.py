@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import logging
+import shutil
+import subprocess
 import threading
 import time
 from datetime import date, datetime
@@ -35,6 +37,10 @@ class PipelineWorker:
         self.thread: threading.Thread | None = None
         self.paused = False
         self.pause_lock = threading.Lock()
+        self.guard_paused = False
+        self.guard_temperature: float | None = None
+        self.temp_checked_at = 0.0
+        self.temp_lock = threading.Lock()
 
     def start(self) -> None:
         if self.thread and self.thread.is_alive():
@@ -57,6 +63,44 @@ class PipelineWorker:
         with self.pause_lock:
             return self.paused
 
+    def is_guard_paused(self) -> bool:
+        with self.temp_lock:
+            return self.guard_paused
+
+    def _gpu_temperature(self) -> float | None:
+        if self.settings.whisper_device != "cuda":
+            return None
+        with self.temp_lock:
+            now = time.monotonic()
+            if now - self.temp_checked_at < 5:
+                return self.guard_temperature
+        executable = shutil.which("nvidia-smi")
+        if not executable:
+            return None
+        try:
+            result = subprocess.run(
+                [
+                    executable,
+                    "--query-gpu=temperature.gpu",
+                    "--format=csv,noheader,nounits",
+                ],
+                capture_output=True,
+                text=True,
+                timeout=5,
+            )
+            value = float(result.stdout.strip().splitlines()[0])
+        except (OSError, subprocess.TimeoutExpired, ValueError, IndexError):
+            value = None
+        with self.temp_lock:
+            if value is not None:
+                self.guard_temperature = value
+                if value >= self.settings.gpu_temp_pause:
+                    self.guard_paused = True
+                elif value <= self.settings.gpu_temp_resume:
+                    self.guard_paused = False
+            self.temp_checked_at = time.monotonic()
+        return value
+
     def recover_stale(self) -> None:
         with self.db.session() as session:
             records = session.scalars(
@@ -68,7 +112,8 @@ class PipelineWorker:
                 record.error = None
 
     def _claim(self) -> str | None:
-        if self.is_paused():
+        self._gpu_temperature()
+        if self.is_paused() or self.is_guard_paused():
             return None
         with self.db.session() as session:
             record = session.scalar(

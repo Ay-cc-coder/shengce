@@ -127,7 +127,7 @@ export function SystemPage() {
     );
   }
 
-  const { asr, resources, queue, gpus, worker } = data;
+  const { asr, resources, queue, gpus, worker, thermal } = data;
   const currentGpu = gpus.find((gpu) => gpu.index === gpuIndex);
   const gpuAvailable = asr.gpu_supported && gpus.length > 0;
   const cpuPercent = Math.min(100, resources.cpu_percent);
@@ -163,6 +163,19 @@ export function SystemPage() {
               如果 NAS 已经通过 Docker 透传 NVIDIA GPU，可以切换到 CUDA 镜像：
               在 compose 叠加 <code>docker-compose.gpu.yml</code>，并使用
               <code>ghcr.io/ay-cc-coder/shengce:cuda</code>。重启后这个页面会显示显卡并允许选择。
+            </p>
+          </div>
+        </div>
+      ) : null}
+
+      {worker.guard_paused ? (
+        <div className="notice notice--warning">
+          <WarningCircle size={20} aria-hidden="true" />
+          <div>
+            <strong>GPU 温度达到 {thermal.pause_c}°C，已自动暂停领取新文件。</strong>
+            <p>
+              当前温度约 {thermal.temperature_c ?? worker.temperature ?? "—"}°C。降温到 {thermal.resume_c}°C
+              以下会自动继续。温度保护只看 GPU 温度，不判断风扇转速；油冷/无风扇方案可以正常使用。
             </p>
           </div>
         </div>
@@ -260,6 +273,7 @@ export function SystemPage() {
             </div>
             <p className="system-hint">
               切换设备或模型后，正在处理的文件会继续用旧设置；从下一段录音开始使用新设置。GPU 模式使用 float16，CPU 模式使用 int8。
+              温度保护：≥{thermal.pause_c}°C 自动暂停，≤{thermal.resume_c}°C 自动继续；不判断风扇转速。
             </p>
           </section>
 
@@ -268,12 +282,23 @@ export function SystemPage() {
               <h2>容器资源</h2>
               <span className="section-count">实时</span>
               <div className="section-heading__spacer" />
-              <Tag tone={worker.paused ? "muted" : "amber"}>
-                {worker.paused ? "处理已暂停" : worker.enabled ? "正在处理" : "队列空闲"}
+              <Tag tone={worker.paused || worker.guard_paused ? "muted" : "amber"}>
+                {worker.guard_paused
+                  ? "温度保护"
+                  : worker.paused
+                    ? "处理已暂停"
+                    : worker.enabled
+                      ? "正在处理"
+                      : "队列空闲"}
               </Tag>
-              <button type="button" className="btn btn--ghost btn--small" onClick={() => void toggleWorker()} disabled={busy}>
+              <button
+                type="button"
+                className="btn btn--ghost btn--small"
+                onClick={() => void toggleWorker()}
+                disabled={busy || (worker.guard_paused && !worker.paused)}
+              >
                 {worker.paused ? <Play size={15} aria-hidden="true" /> : <Pause size={15} aria-hidden="true" />}
-                {worker.paused ? "继续转写" : "暂停转写"}
+                {worker.guard_paused && !worker.paused ? "等待降温" : worker.paused ? "继续转写" : "暂停转写"}
               </button>
             </div>
 
@@ -391,6 +416,7 @@ export function SystemPage() {
               <p><Cpu size={16} aria-hidden="true" /> GPU 模式下 CPU 只做预处理，仍建议保留内存上限。</p>
               <p><GraphicsCard size={16} aria-hidden="true" /> {data.intel_note}</p>
               <p><ListBullets size={16} aria-hidden="true" /> 暂停只会停止领取新文件，不会中断正在转写的那一段。</p>
+              <p><Thermometer size={16} aria-hidden="true" /> 只看 GPU 温度，风扇 0% 不会被当成错误；油冷方案可按实际温度调整阈值。</p>
             </div>
           </section>
         </aside>

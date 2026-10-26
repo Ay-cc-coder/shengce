@@ -181,6 +181,8 @@ environment:
 | `WHISPER_DEVICE_INDEX` | `0` | 多卡时选择第几张 NVIDIA 卡 |
 | `WHISPER_COMPUTE_TYPE` | `int8` | CPU 推荐 `int8`；GPU 可用 `float16` |
 | `WHISPER_CPU_THREADS` | `2` | CTranslate2 使用的 CPU 线程数；NAS 上别设太高 |
+| `GPU_TEMP_PAUSE` | `86` | GPU 达到此温度自动暂停领取新文件 |
+| `GPU_TEMP_RESUME` | `80` | GPU 降到此温度以下自动继续 |
 | `WHISPER_PROMPT` | 空 | 默认关闭；只有需要加人名/专业词时才填，过长可能被模型重复 |
 | `ASR_ENGINE` | `faster` | `faster` 正常转写；`fake` 读取夹具，仅供开发 |
 | `LLM_BASE_URL` | `https://api.deepseek.com/v1` | OpenAI 兼容接口地址 |
