@@ -202,7 +202,7 @@ export function SystemPage() {
                 <Cpu size={22} aria-hidden="true" />
                 <span>
                   <strong>CPU</strong>
-                  <small>{asr.threads} 线程 · {asr.compute_type === "int8" ? "int8" : asr.compute_type}</small>
+                  <small>{asr.threads} 线程 · CPU int8</small>
                 </span>
                 {device === "cpu" ? <CheckCircle size={18} weight="fill" aria-hidden="true" /> : null}
               </button>

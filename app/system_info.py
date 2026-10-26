@@ -22,6 +22,8 @@ from .utils import iso_utc
 CGROUP = Path("/sys/fs/cgroup")
 _last_cpu: tuple[float, float] | None = None
 _cpu_lock = threading.Lock()
+_gpu_cache: list[dict[str, Any]] = []
+_gpu_cache_at: float = 0.0
 
 
 def _read(path: Path) -> str | None:
@@ -165,6 +167,7 @@ def cuda_device_count() -> int:
 
 
 def nvidia_gpus() -> tuple[list[dict[str, Any]], str | None]:
+    global _gpu_cache, _gpu_cache_at
     executable = shutil.which("nvidia-smi")
     if not executable:
         return [], "当前容器中没有 nvidia-smi（CPU 镜像或未启用 GPU）"
@@ -174,10 +177,14 @@ def nvidia_gpus() -> tuple[list[dict[str, Any]], str | None]:
         "--format=csv,noheader,nounits",
     ]
     try:
-        result = subprocess.run(command, capture_output=True, text=True, timeout=5)
+        result = subprocess.run(command, capture_output=True, text=True, timeout=10)
     except (OSError, subprocess.TimeoutExpired) as exc:
+        if _gpu_cache and time.time() - _gpu_cache_at < 120:
+            return [dict(item) for item in _gpu_cache], f"nvidia-smi 暂时不可用（{type(exc).__name__}），显示最近一次结果"
         return [], f"nvidia-smi 调用失败：{type(exc).__name__}"
     if result.returncode != 0:
+        if _gpu_cache and time.time() - _gpu_cache_at < 120:
+            return [dict(item) for item in _gpu_cache], "nvidia-smi 暂时返回错误，显示最近一次结果"
         return [], "nvidia-smi 返回错误，容器可能没有 GPU 访问权限"
     gpus: list[dict[str, Any]] = []
     for row in csv.reader(io.StringIO(result.stdout)):
@@ -197,6 +204,9 @@ def nvidia_gpus() -> tuple[list[dict[str, Any]], str | None]:
             )
         except ValueError:
             continue
+    if gpus:
+        _gpu_cache = [dict(item) for item in gpus]
+        _gpu_cache_at = time.time()
     return gpus, None
 
 
