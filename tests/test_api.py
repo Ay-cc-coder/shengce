@@ -135,3 +135,31 @@ def test_filename_date_and_contact_are_used(client: TestClient) -> None:
     item = response.json()["item"]
     assert item["recorded_at"] == "2025-10-20T10:32:10Z"
     assert item["contact"]["name"] == "陈岚"
+
+
+def test_system_page_reports_cpu_and_queue(client: TestClient) -> None:
+    payload = client.get("/api/system").json()
+    assert payload["asr"]["device"] == "cpu"
+    assert payload["asr"]["gpu_supported"] is False
+    assert payload["queue"]["queued"] == 0
+    assert "cpu_percent" in payload["resources"]
+
+    paused = client.post("/api/system/worker", json={"paused": True})
+    assert paused.status_code == 200
+    assert paused.json()["worker"]["paused"] is True
+
+
+def test_system_rejects_gpu_on_cpu_image(client: TestClient) -> None:
+    response = client.post(
+        "/api/system/asr",
+        json={"device": "cuda", "device_index": 0, "model": "small"},
+    )
+    assert response.status_code == 400
+    assert "CPU 镜像" in response.json()["detail"]
+
+    response = client.post(
+        "/api/system/asr",
+        json={"device": "cpu", "device_index": 0, "model": "base"},
+    )
+    assert response.status_code == 200
+    assert response.json()["asr"]["model"] == "base"

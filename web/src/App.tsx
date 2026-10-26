@@ -12,6 +12,7 @@ import { CallsPage } from "./pages/CallsPage";
 import { ActionsPage } from "./pages/ActionsPage";
 import { FilesPage } from "./pages/FilesPage";
 import { SetupPage } from "./pages/SetupPage";
+import { SystemPage } from "./pages/SystemPage";
 import { NotFoundPage } from "./pages/NotFoundPage";
 
 function ScrollToTop() {
@@ -94,6 +95,7 @@ export function App() {
           <Route path="actions" element={<ActionsPage />} />
           <Route path="library" element={<FilesPage />} />
           <Route path="setup" element={<SetupPage />} />
+          <Route path="system" element={<SystemPage />} />
           <Route path="*" element={<NotFoundPage />} />
         </Route>
       </Routes>

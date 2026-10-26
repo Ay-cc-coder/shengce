@@ -1,0 +1,17 @@
+# 可选：NVIDIA GPU 加速（需要 fnOS 已安装 NVIDIA 驱动和 NVIDIA Container Toolkit）。
+# 与主 compose 叠加：
+#   docker compose -f docker-compose.yml -f docker-compose.gpu.yml up -d
+services:
+  shengce:
+    image: ghcr.io/ay-cc-coder/shengce:cuda
+    gpus: all
+    environment:
+      ASR_GPU_SUPPORTED: "1"
+      WHISPER_DEVICE: cuda
+      WHISPER_COMPUTE_TYPE: float16
+      WHISPER_CPU_THREADS: "4"
+      WHISPER_MODEL: small
+      START_WORKER: "1"
+    cpus: "4.0"
+    mem_limit: "4g"
+    mem_reservation: "1g"

@@ -150,8 +150,16 @@ data/
 
 ## 资源占用与 GPU
 
-- 默认是 **CPU 转写**，不会使用 GPU；当前镜像没有 CUDA runtime，Intel/AMD 核显也不被 faster-whisper 支持。
-- 默认 compose 已加 `cpus: "2.0"`、`mem_limit: "3g"`、`pids_limit: 256`，并限制 Whisper 线程数为 2。
+- 默认镜像是 **CPU 镜像**，不会使用 GPU；NVIDIA 加速要换成 `ghcr.io/ay-cc-coder/shengce:cuda`。
+- 前提是 `docker run --rm --gpus all nvidia/cuda:12.4.1-base-ubuntu22.04 nvidia-smi` 能看到显卡。
+- 叠加 GPU compose：
+  ```bash
+  curl -fLO https://raw.githubusercontent.com/Ay-cc-coder/shengce/main/docker-compose.gpu.yml
+  docker compose -f docker-compose.yml -f docker-compose.gpu.yml up -d
+  ```
+- 然后打开 `http://NAS的IP:3000/system`，可以看到 GPU、显存、利用率，并选择 CPU/GPU 和模型。
+- Intel / AMD 核显（UHD 730 等）暂不被 faster-whisper 使用，只能使用 NVIDIA。
+- CPU compose 已加 `cpus: "2.0"`、`mem_limit: "3g"`、`pids_limit: 256`，并限制 Whisper 线程数为 2。GPU compose 会放宽到 4 核 / 4 GB。
 - 如果 NAS 内存较小，把 `WHISPER_MODEL` 改成 `base`，把 `mem_limit` 降到 `2g`，把 `WHISPER_CPU_THREADS` / `OMP_NUM_THREADS` 改成 `1`。
 - 如果 NAS 已经卡死过，先把 `START_WORKER` 设为 `"0"` 暂停队列，检查 OOM，再逐步恢复。
 
@@ -171,6 +179,6 @@ dmesg -T | grep -i -E 'oom|killed process' | tail -20
 | 手机 WebDAV 测试失败 | 必须 HTTPS；检查域名、证书、反代是否保留 `/dav/` |
 | 首次转写很慢 | 首次下载模型；CPU 上 `small` 需要一点时间 |
 | NAS 卡死 / 内存报警 | 先把 `START_WORKER` 设为 `"0"`；检查 `OOMKilled`；降低 `WHISPER_MODEL` 和 `mem_limit` |
-| 没有使用 GPU | 当前镜像按 CPU 构建；Intel/AMD 核显不支持，NVIDIA 需 CUDA 镜像和 GPU 挂载 |
+| 没有使用 GPU | CPU 镜像不包含 CUDA；换 `:cuda` 镜像并加 `gpus: all`；Intel/AMD 核显不支持 |
 | 80/443 报 `port is already allocated` | 使用了 `docker-compose.tls.yml`；fnOS 上不要用，改用已有反代 |
 | 页面打不开 | `docker compose ps` 看容器是否 Up；`docker compose logs -f` 看日志 |

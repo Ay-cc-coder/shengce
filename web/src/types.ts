@@ -183,3 +183,51 @@ export interface SetupInfo {
   failed: number;
   version: string;
 }
+
+export interface SystemGpu {
+  index: number;
+  name: string;
+  memory_total_mb: number;
+  memory_used_mb: number;
+  utilization_percent: number;
+  temperature_c: number;
+  driver_version: string;
+}
+
+export interface SystemInfo {
+  asr: {
+    device: "cpu" | "cuda";
+    device_index: number;
+    model: string;
+    compute_type: string;
+    threads: number;
+    gpu_supported: boolean;
+    gpu_image: boolean;
+  };
+  gpus: SystemGpu[];
+  gpu_error: string | null;
+  cuda_device_count: number;
+  intel_note: string;
+  resources: {
+    cpu_percent: number;
+    cpu_cores_used: number;
+    cpu_limit: number;
+    memory_used: number;
+    memory_limit: number;
+    memory_percent: number;
+    host_memory_total: number;
+    host_memory_available: number;
+    host_memory_used: number;
+    load_1: number;
+    load_5: number;
+    load_15: number;
+  };
+  queue: {
+    queued: number;
+    processing: number;
+    failed: number;
+    current: { id: string; title: string; name: string; stage: string } | null;
+  };
+  worker: { paused: boolean; enabled: boolean };
+  timestamp: string;
+}

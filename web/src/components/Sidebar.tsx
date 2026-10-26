@@ -1,6 +1,7 @@
 import {
   CheckSquare,
   FolderOpen,
+  Gauge,
   GearSix,
   House,
   PhoneCall,
@@ -59,6 +60,9 @@ export function Sidebar() {
       <div className="mobile-top">
         <Brand />
         <div className="mobile-top__actions">
+          <NavLink to="/system" className="icon-btn" aria-label="运行状态">
+            <Gauge size={19} />
+          </NavLink>
           <NavLink to="/setup" className="icon-btn" aria-label="接入手机">
             <GearSix size={19} />
           </NavLink>
@@ -101,6 +105,10 @@ export function Sidebar() {
         </nav>
 
         <div className="sidebar__foot">
+          <NavLink to="/system" className="sidebar__setup">
+            <Gauge size={17} aria-hidden="true" />
+            <span>运行状态</span>
+          </NavLink>
           <NavLink to="/setup" className="sidebar__setup">
             <GearSix size={17} aria-hidden="true" />
             <span>接入手机</span>

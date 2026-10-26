@@ -33,6 +33,8 @@ class PipelineWorker:
         self.settings = settings
         self.stop_event = threading.Event()
         self.thread: threading.Thread | None = None
+        self.paused = False
+        self.pause_lock = threading.Lock()
 
     def start(self) -> None:
         if self.thread and self.thread.is_alive():
@@ -47,6 +49,14 @@ class PipelineWorker:
         if self.thread:
             self.thread.join(timeout=5)
 
+    def set_paused(self, paused: bool) -> None:
+        with self.pause_lock:
+            self.paused = bool(paused)
+
+    def is_paused(self) -> bool:
+        with self.pause_lock:
+            return self.paused
+
     def recover_stale(self) -> None:
         with self.db.session() as session:
             records = session.scalars(
@@ -58,6 +68,8 @@ class PipelineWorker:
                 record.error = None
 
     def _claim(self) -> str | None:
+        if self.is_paused():
+            return None
         with self.db.session() as session:
             record = session.scalar(
                 select(FileRecord)

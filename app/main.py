@@ -26,7 +26,9 @@ from .routes.dashboard import router as dashboard_router
 from .routes.files import router as files_router
 from .routes.recordings import router as recordings_router
 from .routes.setup import router as setup_router
+from .routes.system import router as system_router
 from .routes.upload import router as upload_router
+from .runtime import load_runtime
 from .seed import seed_demo_data
 from .utils import now_utc
 
@@ -85,7 +87,14 @@ async def lifespan(app: FastAPI):
     db = init_database(settings.db_path)
     app.state.db = db
     app.state.limiter = LoginLimiter()
-    logger.info("data directory: %s", settings.data_dir)
+    runtime = load_runtime(settings)
+    logger.info(
+        "ASR runtime: device=%s model=%s compute=%s paused=%s",
+        settings.whisper_device,
+        settings.whisper_model,
+        settings.whisper_compute_type,
+        runtime.get("worker_paused", False),
+    )
 
     _cleanup_stale_uploads(settings)
     try:
@@ -104,6 +113,7 @@ async def lifespan(app: FastAPI):
             logger.exception("demo seed failed")
 
     worker = PipelineWorker(db, settings)
+    worker.set_paused(bool(runtime.get("worker_paused", False)))
     app.state.worker = worker
     if settings.start_worker:
         worker.start()
@@ -143,6 +153,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(contacts_router)
     app.include_router(files_router)
     app.include_router(setup_router)
+    app.include_router(system_router)
     app.include_router(upload_router)
     app.include_router(dav_router)
 

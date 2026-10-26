@@ -45,6 +45,7 @@ class Settings:
     session_secret: str = field(default_factory=lambda: os.getenv("SESSION_SECRET", ""))
     whisper_model: str = field(default_factory=lambda: os.getenv("WHISPER_MODEL", "small"))
     whisper_device: str = field(default_factory=lambda: os.getenv("WHISPER_DEVICE", "cpu"))
+    whisper_device_index: int = field(default_factory=lambda: _int("WHISPER_DEVICE_INDEX", 0))
     whisper_compute_type: str = field(
         default_factory=lambda: os.getenv("WHISPER_COMPUTE_TYPE", "int8")
     )
@@ -56,6 +57,7 @@ class Settings:
         )
     )
     asr_engine: str = field(default_factory=lambda: os.getenv("ASR_ENGINE", "faster"))
+    asr_gpu_supported: bool = field(default_factory=lambda: _bool("ASR_GPU_SUPPORTED", False))
     llm_base_url: str = field(
         default_factory=lambda: os.getenv("LLM_BASE_URL", "https://api.deepseek.com/v1")
     )

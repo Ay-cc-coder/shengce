@@ -16,6 +16,7 @@
 - **待办**：从“需要你做的事”里抽出待办，支持勾选完成、截止日期、跳回原话时间点。
 - **通话统计**：常联系人排行、通话量趋势、来电时段、单日通话分布；支持 7 / 30 / 90 天。
 - **文件库**：所有上传文件按类型归档，音频可直接播放，其他文件可下载。
+- **运行状态**：WebUI 实时显示容器 CPU、内存、NAS 内存、队列、GPU 显存/利用率和当前识别设备。
 - **私人部署**：单用户密码登录，数据只保存在 `data/`；默认不向外部服务发送任何内容。
 
 | 录音详情：对话与摘要 | 通话统计：频繁联系的人 |
@@ -176,7 +177,8 @@ environment:
 | `TZ` | `Asia/Shanghai` | 统计和“今天”的时区 |
 | `WHISPER_MODEL` | `small` | `base` / `small` / `medium` / `large-v3` |
 | `WHISPER_LANGUAGE` | `zh` | 转写语言 |
-| `WHISPER_DEVICE` | `cpu` | 有 CUDA 时可改 `cuda` 并自行给容器加 GPU |
+| `WHISPER_DEVICE` | `cpu` | 使用 GPU 时由 `docker-compose.gpu.yml` 设为 `cuda` |
+| `WHISPER_DEVICE_INDEX` | `0` | 多卡时选择第几张 NVIDIA 卡 |
 | `WHISPER_COMPUTE_TYPE` | `int8` | CPU 推荐 `int8`；GPU 可用 `float16` |
 | `WHISPER_CPU_THREADS` | `2` | CTranslate2 使用的 CPU 线程数；NAS 上别设太高 |
 | `WHISPER_PROMPT` | 简体中文提示 | 让模型优先输出简体中文，可留空 |
@@ -208,17 +210,53 @@ LLM_MODEL=deepseek-chat
 
 默认 `small` + CPU `int8`，在普通小服务器上可用，但长录音会慢。中文电话录音如果追求更高质量，可换 `medium`；首次切换会重新下载模型。模型缓存在 `data/models/`，重启不会重复下载。
 
+有 NVIDIA 显卡时，使用下面的 `:cuda` 镜像；在 WebUI「运行状态」页可以直接选择 GPU 和模型。
+
 ## 资源占用、GPU 与 NAS 稳定性
 
-### 为什么默认只用 CPU
+### 两个镜像
 
-当前镜像按 **CPU** 构建和运行：
+| 镜像 | 用途 |
+| --- | --- |
+| `ghcr.io/ay-cc-coder/shengce:latest` | 默认 CPU 镜像 |
+| `ghcr.io/ay-cc-coder/shengce:cuda` | NVIDIA CUDA 镜像，支持 RTX 3060 等 |
 
-- `WHISPER_DEVICE` 默认是 `cpu`；
-- 容器没有挂载 GPU 设备，也没有 CUDA runtime；
-- CTranslate2 默认会尝试使用较多 CPU 线程，可能把 NAS 的 CPU 吃满；
-- Intel / AMD 核显（iGPU）不能直接被 faster-whisper 使用；
-- 只有 NVIDIA 独显 + 驱动 + NVIDIA Container Toolkit + CUDA 版镜像，才谈得上 GPU。当前镜像不是 CUDA 镜像，所以就算 NAS 有 NVIDIA 卡，仅设置 `WHISPER_DEVICE=cuda` 也不够。
+CPU 镜像不能通过改环境变量使用 GPU，因为它没有 CUDA runtime。要使用显卡，必须切换到 `:cuda` 镜像，并在 compose 里加上 `gpus: all`。
+
+### GPU 加速（NVIDIA）
+
+前提：
+
+- NAS 已安装 NVIDIA 驱动；
+- Docker 已安装 NVIDIA Container Toolkit，并且下面这条命令能输出显卡：
+
+```bash
+docker run --rm --gpus all nvidia/cuda:12.4.1-base-ubuntu22.04 nvidia-smi
+```
+
+然后叠加 GPU 配置：
+
+```bash
+docker compose   -f docker-compose.yml   -f docker-compose.gpu.yml   up -d
+```
+
+`docker-compose.gpu.yml` 会：
+
+- 使用 `ghcr.io/ay-cc-coder/shengce:cuda`；
+- 加 `gpus: all`；
+- 设置 `WHISPER_DEVICE=cuda`、`WHISPER_COMPUTE_TYPE=float16`；
+- 把 CPU/内存上限放宽到 4 核 / 4 GB。
+
+启动后打开 `http://NAS的IP:3000/system`：
+
+- 会列出 NVIDIA 显卡、显存、利用率、温度；
+- 可以选择 GPU 或 CPU；
+- 可以选择 `base` / `small` / `medium` / `large-v3`；
+- 切换后从下一段录音开始使用新模型，正在处理的文件不受影响。
+
+Intel / AMD 核显（例如 UHD 730）暂不被 faster-whisper 使用，页面会明确标注。GPU 模式下 CPU 只做预处理，建议保留内存上限；如果追求最快速度，可以把 `docker-compose.gpu.yml` 的 `cpus` 调高或删掉。
+
+### CPU 默认限制
 
 默认 `docker-compose.yml` 已经加了保护：
 
@@ -389,6 +427,7 @@ docker项目/
 ├── Dockerfile
 ├── docker-compose.yml        默认安装：拉取镜像，仅 3000
 ├── docker-compose.build.yml  可选：源码构建
+├── docker-compose.gpu.yml    可选：NVIDIA CUDA 加速
 ├── docker-compose.tls.yml    可选：Caddy 80/443
 ├── .github/workflows/        GHCR 多架构镜像构建
 ├── Caddyfile
