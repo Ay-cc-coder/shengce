@@ -6,6 +6,7 @@ import os
 import re
 from datetime import datetime, timezone
 from pathlib import Path
+from zoneinfo import ZoneInfo
 from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
 
@@ -104,6 +105,7 @@ def _structured_detail(name: str, device: str, contact: str | None) -> str:
     stem = CONTROL_RE.sub("", Path(name).stem)
     cleaned = STRUCT_ID_RE.sub(" ", stem)
     cleaned = STRUCT_DATE_RE.sub(" ", cleaned)
+    cleaned = re.sub(r"wxid[_\s]*[A-Za-z0-9]+", " ", cleaned, flags=re.IGNORECASE)
     for token in (device, "CallKit音频", "CallKit", "微信视频", "微信", "小1", "小2", "呼出", "拨出", "来电", "呼入", "普通通话", "与对方的通话", "通话录音", "音频"):
         cleaned = cleaned.replace(token, " ")
     if contact:
@@ -137,6 +139,17 @@ def structured_fields(name: str, kind: str, recorded_at, contact_name: str | Non
     }
 
 
+def _local_recorded_date(recorded_at) -> object:
+    if recorded_at is None:
+        return None
+    if isinstance(recorded_at, datetime):
+        value = recorded_at
+        if value.tzinfo is None:
+            value = value.replace(tzinfo=timezone.utc)
+        return value.astimezone(ZoneInfo(os.getenv("TZ", "Asia/Shanghai"))).date()
+    return recorded_at
+
+
 def apply_structured_naming(session: Session, record: FileRecord) -> bool:
     contact_name = None
     if record.contact_id:
@@ -145,11 +158,16 @@ def apply_structured_naming(session: Session, record: FileRecord) -> bool:
     if contact_name in GENERIC_CONTACTS:
         contact_name = None
         record.contact_id = None
-    fields = structured_fields(record.name, record.kind, record.recorded_at, contact_name)
+    fields = structured_fields(
+        record.name,
+        record.kind,
+        _local_recorded_date(record.recorded_at),
+        contact_name,
+    )
     if not fields:
         return False
     before = (record.title, record.category, record.contact_id)
-    if fields["direction"] in {"呼入", "呼出"} and record.kind == "audio":
+    if fields["direction"] in {"呼入", "呼出"} and record.kind in {"audio", "voice"}:
         record.kind = "call"
     if fields["contact"] and not record.contact_id:
         contact = create_contact(session, str(fields["contact"]))
