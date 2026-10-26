@@ -1,0 +1,27 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Verify package
+        run: |
+          test -f packages/*.deb
+          sha256sum packages/*.deb
+
+      - name: Create GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: packages/*.deb
+          generate_release_notes: true
