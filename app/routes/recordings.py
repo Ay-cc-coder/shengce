@@ -12,7 +12,7 @@ from sqlalchemy import func, or_, select
 from sqlalchemy.orm import selectinload
 
 from ..ingest import create_contact, queue_reprocess
-from ..models import FileRecord, Segment, utcnow
+from ..models import Contact, FileRecord, Segment, utcnow
 from ..serializers import file_detail, file_summary
 
 router = APIRouter(prefix="/api/recordings", tags=["recordings"])
@@ -90,7 +90,7 @@ def list_recordings(
             or_(
                 FileRecord.name.ilike(like),
                 FileRecord.title.ilike(like),
-                FileRecord.summary.ilike(like),
+                FileRecord.contact.has(Contact.name.ilike(like)),
                 FileRecord.transcript_text.ilike(like),
                 segment_exists,
             )

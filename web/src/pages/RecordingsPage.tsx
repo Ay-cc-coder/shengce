@@ -67,6 +67,15 @@ export function RecordingsPage() {
     return Array.from(map.entries());
   }, [items]);
 
+  const handleQueryChange = (value: string) => {
+    setQuery(value);
+    // Searching is global: don't keep a stale direction/type filter that
+    // hides matching calls (e.g. searching 老妈 while 语音备忘 is selected).
+    if (value.trim() && category) {
+      setCategory("");
+    }
+  };
+
   const clearContact = () => {
     const next = new URLSearchParams(params);
     next.delete("contact");
@@ -112,8 +121,8 @@ export function RecordingsPage() {
         </div>
         <SearchField
           value={query}
-          onChange={setQuery}
-          placeholder="搜标题、摘要或对话"
+          onChange={handleQueryChange}
+          placeholder="搜标题、联系人或对话"
           label="搜索录音"
           className="toolbar__search"
         />
