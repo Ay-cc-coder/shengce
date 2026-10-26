@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import time
 from typing import Any
 
 import httpx
@@ -62,38 +63,42 @@ def _headers(settings: Settings) -> dict[str, str]:
 
 def chat(settings: Settings, messages: list[dict[str, str]], max_tokens: int = 1200) -> str:
     last_error: Exception | None = None
+    transient = {502, 503, 504}
     with httpx.Client(timeout=settings.llm_timeout) as client:
-        for base in _api_bases(settings.llm_base_url):
-            try:
-                response = client.post(
-                    base + "/chat/completions",
-                    headers=_headers(settings),
-                    json={
-                        "model": settings.llm_model,
-                        "messages": messages,
-                        "temperature": 0.1,
-                        "max_tokens": max_tokens,
-                    },
-                )
-            except httpx.HTTPError as exc:
-                last_error = exc
-                continue
-            if response.status_code in {404, 405}:
-                last_error = RuntimeError(f"接口返回 {response.status_code}")
-                continue
-            if response.status_code >= 400:
-                detail = response.text[:200]
-                raise RuntimeError(f"AI 接口返回 {response.status_code}：{detail}")
-            payload = response.json()
-            choices = payload.get("choices") or []
-            if not choices:
-                raise RuntimeError("AI 服务没有返回 choices。")
-            message = choices[0].get("message") or {}
-            content = message.get("content")
-            if not isinstance(content, str) or not content.strip():
-                raise RuntimeError("AI 返回了空内容。")
-            return content
-    raise RuntimeError(f"无法连接 AI 接口：{last_error or '没有可用地址'}")
+        for attempt in range(2):
+            for base in _api_bases(settings.llm_base_url):
+                try:
+                    response = client.post(
+                        base + "/chat/completions",
+                        headers=_headers(settings),
+                        json={
+                            "model": settings.llm_model,
+                            "messages": messages,
+                            "temperature": 0.1,
+                            "max_tokens": max_tokens,
+                        },
+                    )
+                except httpx.HTTPError as exc:
+                    last_error = exc
+                    continue
+                if response.status_code in {404, 405} | transient:
+                    last_error = RuntimeError(f"接口返回 {response.status_code}")
+                    continue
+                if response.status_code >= 400:
+                    detail = response.text[:200]
+                    raise RuntimeError(f"AI 接口返回 {response.status_code}：{detail}")
+                payload = response.json()
+                choices = payload.get("choices") or []
+                if not choices:
+                    raise RuntimeError("AI 服务没有返回 choices。")
+                message = choices[0].get("message") or {}
+                content = message.get("content")
+                if not isinstance(content, str) or not content.strip():
+                    raise RuntimeError("AI 返回了空内容。")
+                return content
+            if attempt == 0:
+                time.sleep(1.0)
+    raise RuntimeError(f"AI 接口暂不可用：{last_error or '没有可用地址'}。如果反复 502，通常是服务商上游问题，换一个模型或服务商再试。")
 
 
 def list_models(settings: Settings) -> list[str]:
@@ -179,7 +184,7 @@ def generate_rules(db: Database, settings: Settings) -> dict[str, Any]:
         names = [
             row
             for row in session.scalars(
-                select(FileRecord.name).order_by(FileRecord.uploaded_at.desc()).limit(160)
+                select(FileRecord.name).order_by(FileRecord.uploaded_at.desc()).limit(80)
             ).all()
         ]
     unique: list[str] = []
@@ -190,7 +195,7 @@ def generate_rules(db: Database, settings: Settings) -> dict[str, Any]:
             seen.add(name)
     if not unique:
         raise RuntimeError("还没有录音文件，无法生成规则。")
-    sample = "\n".join(unique[:120])
+    sample = "\n".join(unique[:80])
     content = chat(
         settings,
         [

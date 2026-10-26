@@ -59,6 +59,7 @@ export function AiPage() {
   const [applying, setApplying] = useState(false);
   const [fetchingModels, setFetchingModels] = useState(false);
   const [models, setModels] = useState<string[]>([]);
+  const [manualModel, setManualModel] = useState(false);
   const [initialized, setInitialized] = useState(false);
 
   useEffect(() => {
@@ -110,6 +111,7 @@ export function AiPage() {
       if (!saved) return;
       const result = await api.get<{ models: string[] }>("/api/ai/models");
       setModels(result.models);
+      setManualModel(false);
       if (result.models.length && !result.models.includes(model)) {
         setModel(result.models[0]);
       }
@@ -240,13 +242,20 @@ export function AiPage() {
             <label className="field">
               <span className="field__label">模型名</span>
               <div className="field__row">
-                <input
-                  list="ai-model-options"
-                  value={model}
-                  onChange={(event) => setModel(event.target.value)}
-                  placeholder={currentPreset?.model || "deepseek-chat"}
-                  spellCheck={false}
-                />
+                {models.length && !manualModel ? (
+                  <select value={model} onChange={(event) => setModel(event.target.value)}>
+                    {models.map((item) => (
+                      <option key={item} value={item}>{item}</option>
+                    ))}
+                  </select>
+                ) : (
+                  <input
+                    value={model}
+                    onChange={(event) => setModel(event.target.value)}
+                    placeholder={currentPreset?.model || "deepseek-chat"}
+                    spellCheck={false}
+                  />
+                )}
                 <button
                   type="button"
                   className="btn btn--ghost btn--small"
@@ -257,12 +266,14 @@ export function AiPage() {
                   {fetchingModels ? "获取中" : "获取模型"}
                 </button>
               </div>
-              <datalist id="ai-model-options">
-                {models.map((item) => (
-                  <option key={item} value={item} />
-                ))}
-              </datalist>
-              <small className="field__hint">不知道模型名时，先点“获取模型”；也可以手动填写。</small>
+              <div className="field__actions">
+                {models.length ? (
+                  <button type="button" className="link-btn" onClick={() => setManualModel((value) => !value)}>
+                    {manualModel ? "从已获取列表选择" : "找不到？手动输入"}
+                  </button>
+                ) : null}
+                <small className="field__hint">先点“获取模型”会自动列出服务商返回的全部模型；也可以手动填写。</small>
+              </div>
             </label>
           </div>
 

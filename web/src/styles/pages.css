@@ -2191,3 +2191,25 @@ a.file-row__title:hover {
   color: var(--muted-2);
   font-size: 10px;
 }
+
+.field__actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-top: 5px;
+}
+
+.field__actions .field__hint {
+  margin-top: 0;
+}
+
+.link-btn {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--amber-deep);
+  font-size: 10.5px;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
