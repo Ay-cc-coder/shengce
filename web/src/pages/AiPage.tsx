@@ -62,10 +62,15 @@ export function AiPage() {
   const [manualModel, setManualModel] = useState(false);
   const [initialized, setInitialized] = useState(false);
   const modelsLoaded = useRef(false);
+  const modelRef = useRef(model);
 
   useEffect(() => {
     document.title = "AI 分类 · 声册";
   }, []);
+
+  useEffect(() => {
+    modelRef.current = model;
+  }, [model]);
 
   useEffect(() => {
     if (!configApi.data || initialized) return;
@@ -82,7 +87,7 @@ export function AiPage() {
       setModels(result.models);
       modelsLoaded.current = true;
       setManualModel(false);
-      if (result.models.length && !result.models.includes(model)) {
+      if (result.models.length && !modelRef.current) {
         setModel(result.models[0]);
       }
       return result.models;
@@ -263,6 +268,9 @@ export function AiPage() {
               <div className="field__row">
                 {models.length && !manualModel ? (
                   <select value={model} onChange={(event) => setModel(event.target.value)}>
+                    {model && !models.includes(model) ? (
+                      <option value={model}>{model}（当前已保存）</option>
+                    ) : null}
                     {models.map((item) => (
                       <option key={item} value={item}>{item}</option>
                     ))}
