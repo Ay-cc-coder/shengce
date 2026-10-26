@@ -214,3 +214,32 @@ def test_ai_base_url_normalization() -> None:
         "http://192.168.5.221:11434/v1",
         "http://192.168.5.221:11434",
     ]
+
+
+def test_structured_call_naming() -> None:
+    from datetime import date
+
+    from app.ingest import structured_fields
+
+    fields = structured_fields(
+        "CallKit音频(沈通){76EA68EF-F4B6-5104-7BB6-FC4D04}[41]",
+        "call",
+        date(2026, 10, 27),
+        None,
+    )
+    assert fields["direction"] == "呼入"
+    assert fields["device"] == "CallKit"
+    assert fields["contact"] == "沈通"
+    assert fields["category"] == "呼入"
+    assert fields["title"].startswith("呼入-CallKit-沈通-2026-10-27-")
+
+    outgoing = structured_fields(
+        "微信呼出 派大星(赵天赐)[10-23_04-55-34]",
+        "call",
+        date(2026, 10, 23),
+        None,
+    )
+    assert outgoing["direction"] == "呼出"
+    assert outgoing["device"] == "微信"
+    assert outgoing["contact"] == "赵天赐"
+    assert outgoing["title"].startswith("呼出-微信-赵天赐-2026-10-23-")

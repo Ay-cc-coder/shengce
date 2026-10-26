@@ -51,6 +51,7 @@ def list_recordings(
     request: Request,
     q: str = Query("", max_length=200),
     kind: str = Query("", max_length=40),
+    category: str = Query("", max_length=40),
     status: str = Query("", max_length=20),
     contact_id: str = Query("", max_length=40),
     days: int = Query(0, ge=0, le=3650),
@@ -67,6 +68,8 @@ def list_recordings(
             conditions.append(FileRecord.kind.in_({"call", "voice"}))
         else:
             conditions.append(FileRecord.kind == kind)
+    if category:
+        conditions.append(FileRecord.category == category)
     if status:
         conditions.append(FileRecord.status == status)
     if contact_id:

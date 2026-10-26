@@ -44,6 +44,110 @@ def create_contact(session: Session, name: str, phone: str | None = None) -> Con
     return contact
 
 
+PAREN_CONTACT_RE = re.compile(r"[（(]\s*([\u4e00-\u9fff·]{2,4})\s*[）)]")
+STRUCT_ID_RE = re.compile(r"\{[^}]*\}|\[[^\]]*\]")
+STRUCT_DATE_RE = re.compile(
+    r"(20\d{2})[-_.年]?(\d{1,2})[-_.月]?(\d{1,2})|\d{2,4}[-_.]\d{1,2}[-_.]\d{1,2}"
+)
+
+
+def _contact_from_filename(name: str) -> str | None:
+    for match in PAREN_CONTACT_RE.finditer(name):
+        value = match.group(1).strip(" -_.")
+        if value in {"未知来电", "未知号码", "陌生人", "未接来电", "通话录音"}:
+            continue
+        if value:
+            return value
+    return None
+
+
+def _device_from_name(name: str) -> str:
+    lower = name.lower()
+    if "callkit" in lower:
+        return "CallKit"
+    if "微信视频" in name:
+        return "微信视频"
+    if "微信" in name:
+        return "微信"
+    if "小1" in name:
+        return "小1"
+    if "小2" in name:
+        return "小2"
+    if "facetime" in lower:
+        return "FaceTime"
+    if "普通通话" in name:
+        return "电话"
+    return "电话"
+
+
+def _direction_from_name(name: str, kind: str) -> str:
+    if kind == "voice":
+        return "语音备忘"
+    if kind == "audio":
+        return "音频"
+    lower = name.lower()
+    if any(token in name for token in ("呼出", "拨出")) or any(
+        token in lower for token in ("outgoing", "dial")
+    ):
+        return "呼出"
+    if any(token in name for token in ("来电", "呼入")) or any(
+        token in lower for token in ("incoming", "callkit")
+    ):
+        return "呼入"
+    return "通话"
+
+
+def _structured_detail(name: str, device: str, contact: str | None) -> str:
+    stem = Path(name).stem
+    cleaned = STRUCT_ID_RE.sub(" ", stem)
+    cleaned = STRUCT_DATE_RE.sub(" ", cleaned)
+    for token in (device, "CallKit音频", "CallKit", "微信视频", "微信", "小1", "小2", "呼出", "拨出", "来电", "呼入", "普通通话", "与对方的通话", "通话录音"):
+        cleaned = cleaned.replace(token, " ")
+    if contact:
+        cleaned = cleaned.replace(contact, " ")
+    cleaned = re.sub(r"[（()）【】\[\]{}_\-.,，。:：|]+", " ", cleaned)
+    cleaned = re.sub(r"\s+", " ", cleaned).strip(" -_.")
+    if not cleaned or not re.search(r"[\u4e00-\u9fffA-Za-z]", cleaned):
+        return "通话录音"
+    return cleaned[:60]
+
+
+def structured_fields(name: str, kind: str, recorded_at, contact_name: str | None) -> dict[str, str | None]:
+    if kind not in {"call", "voice", "audio"}:
+        return {}
+    direction = _direction_from_name(name, kind)
+    device = _device_from_name(name)
+    contact = contact_name or _contact_from_filename(name)
+    date_part = recorded_at.strftime("%Y-%m-%d") if recorded_at else "未知日期"
+    detail = _structured_detail(name, device, contact)
+    title = f"{direction}-{device}-{contact or '未识别'}-{date_part}-{detail}"
+    category = direction if direction in {"呼入", "呼出"} else ("语音备忘" if kind == "voice" else ("音频" if kind == "audio" else "通话"))
+    return {
+        "direction": direction,
+        "device": device,
+        "contact": contact,
+        "category": category,
+        "title": title[:200],
+    }
+
+
+def apply_structured_naming(session: Session, record: FileRecord) -> bool:
+    contact_name = None
+    if record.contact_id:
+        contact = session.get(Contact, record.contact_id)
+        contact_name = contact.name if contact else None
+    fields = structured_fields(record.name, record.kind, record.recorded_at, contact_name)
+    if not fields:
+        return False
+    before = (record.title, record.category, record.contact_id)
+    if fields["contact"] and not record.contact_id:
+        contact = create_contact(session, str(fields["contact"]))
+        record.contact_id = contact.id
+    record.category = str(fields["category"] or record.category)
+    record.title = str(fields["title"] or record.title)
+    return (record.title, record.category, record.contact_id) != before
+
+
 def category_for_text(text: str) -> tuple[str, list[str]]:
     rules: list[tuple[str, tuple[str, ...]]] = [
         ("合同与报价", ("合同", "报价", "甲方", "乙方", "条款", "协议", "订单")),
@@ -145,10 +249,10 @@ def apply_rules_to_existing(db: Database) -> int:
         rows = session.scalars(select(FileRecord)).all()
         for record in rows:
             rule = _classification_rule(session, record.name)
-            if rule is None:
-                continue
             before = (record.kind, record.category, record.title, record.contact_id)
-            _apply_classification_rule(session, record, rule)
+            if rule is not None:
+                _apply_classification_rule(session, record, rule)
+            apply_structured_naming(session, record)
             after = (record.kind, record.category, record.title, record.contact_id)
             if after != before:
                 changed += 1
@@ -252,6 +356,7 @@ def upsert_file(
         rule = _classification_rule(session, name)
         if rule is not None:
             _apply_classification_rule(session, record, rule)
+        apply_structured_naming(session, record)
 
         session.flush()
         record_id = record.id

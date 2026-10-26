@@ -2213,3 +2213,9 @@ a.file-row__title:hover {
   text-decoration: underline;
   text-underline-offset: 3px;
 }
+
+.toolbar--filters {
+  margin-top: -8px;
+  margin-bottom: 18px;
+  justify-content: flex-start;
+}

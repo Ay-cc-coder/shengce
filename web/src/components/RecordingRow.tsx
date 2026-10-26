@@ -25,6 +25,9 @@ export function RecordingRow({
           <Link to={`/recordings/${recording.id}`} className="rec-row__title">
             {recording.title}
           </Link>
+          {recording.category && recording.category !== "语音备忘" ? (
+            <span className="rec-row__kind">{recording.category}</span>
+          ) : null}
           {recording.kind === "voice" ? <span className="rec-row__kind">语音备忘</span> : null}
           {recording.is_demo ? <span className="rec-row__kind">演示</span> : null}
         </div>

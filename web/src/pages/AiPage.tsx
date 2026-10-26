@@ -328,10 +328,10 @@ export function AiPage() {
               type="button"
               className="btn btn--ghost btn--small"
               onClick={() => void applyRules()}
-              disabled={applying || !rules.length}
+              disabled={applying}
             >
               <ArrowClockwise size={15} aria-hidden="true" />
-              {applying ? "正在应用" : "应用到现有录音"}
+              {applying ? "正在应用" : "应用分类命名"}
             </button>
           </div>
 
