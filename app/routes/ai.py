@@ -8,6 +8,7 @@ from ..ai_classify import (
     apply_rules,
     delete_rule,
     generate_rules,
+    list_models,
     list_rules,
     test_connection,
 )
@@ -41,6 +42,14 @@ def update_ai_config(request: Request, body: AIConfigUpdate) -> dict:
         model=body.model,
         provider=body.provider,
     )
+
+
+@router.get("/models")
+def get_models(request: Request) -> dict:
+    try:
+        return {"models": list_models(request.app.state.settings)}
+    except Exception as exc:
+        raise HTTPException(status_code=400, detail=f"获取模型失败：{exc}") from exc
 
 
 @router.post("/test")

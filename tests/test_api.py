@@ -197,3 +197,14 @@ def test_ai_config_and_rule_application(client: TestClient) -> None:
     assert applied.json()["changed"] >= 1
     rules = client.get("/api/ai/rules").json()["items"]
     assert any(rule["match"] == "陈岚" for rule in rules)
+
+
+def test_ai_base_url_normalization() -> None:
+    from app.ai_classify import _api_bases
+
+    assert _api_bases("https://ai.superdoor.top") == [
+        "https://ai.superdoor.top/v1",
+        "https://ai.superdoor.top",
+    ]
+    assert _api_bases("https://api.deepseek.com/v1/") == ["https://api.deepseek.com/v1"]
+    assert _api_bases("http://192.168.5.221:11434/v1") == ["http://192.168.5.221:11434/v1"]

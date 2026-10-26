@@ -57,6 +57,8 @@ export function AiPage() {
   const [testing, setTesting] = useState(false);
   const [generating, setGenerating] = useState(false);
   const [applying, setApplying] = useState(false);
+  const [fetchingModels, setFetchingModels] = useState(false);
+  const [models, setModels] = useState<string[]>([]);
   const [initialized, setInitialized] = useState(false);
 
   useEffect(() => {
@@ -98,6 +100,24 @@ export function AiPage() {
       return null;
     } finally {
       setSaving(false);
+    }
+  };
+
+  const fetchModels = async () => {
+    setFetchingModels(true);
+    try {
+      const saved = await saveConfig();
+      if (!saved) return;
+      const result = await api.get<{ models: string[] }>("/api/ai/models");
+      setModels(result.models);
+      if (result.models.length && !result.models.includes(model)) {
+        setModel(result.models[0]);
+      }
+      toast.show(`获取到 ${result.models.length} 个模型。`, "success");
+    } catch (err) {
+      toast.show(err instanceof Error ? err.message : "获取模型失败。", "error");
+    } finally {
+      setFetchingModels(false);
     }
   };
 
@@ -219,12 +239,30 @@ export function AiPage() {
 
             <label className="field">
               <span className="field__label">模型名</span>
-              <input
-                value={model}
-                onChange={(event) => setModel(event.target.value)}
-                placeholder={currentPreset?.model || "deepseek-chat"}
-                spellCheck={false}
-              />
+              <div className="field__row">
+                <input
+                  list="ai-model-options"
+                  value={model}
+                  onChange={(event) => setModel(event.target.value)}
+                  placeholder={currentPreset?.model || "deepseek-chat"}
+                  spellCheck={false}
+                />
+                <button
+                  type="button"
+                  className="btn btn--ghost btn--small"
+                  onClick={() => void fetchModels()}
+                  disabled={fetchingModels || saving}
+                >
+                  <ArrowClockwise size={15} aria-hidden="true" />
+                  {fetchingModels ? "获取中" : "获取模型"}
+                </button>
+              </div>
+              <datalist id="ai-model-options">
+                {models.map((item) => (
+                  <option key={item} value={item} />
+                ))}
+              </datalist>
+              <small className="field__hint">不知道模型名时，先点“获取模型”；也可以手动填写。</small>
             </label>
           </div>
 
