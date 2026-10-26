@@ -13,13 +13,10 @@ import {
 } from "../components/ui";
 import { RecordingRow } from "../components/RecordingRow";
 
-type KindFilter = "all" | "call" | "voice";
-
 export function RecordingsPage() {
   const [params, setParams] = useSearchParams();
   const contactId = params.get("contact") || "";
   const contactName = params.get("contactName") || "";
-  const [kind, setKind] = useState<KindFilter>("all");
   const [category, setCategory] = useState("");
   const [query, setQuery] = useState("");
   const debouncedQuery = useDebounced(query, 280);
@@ -30,12 +27,11 @@ export function RecordingsPage() {
     const search = new URLSearchParams();
     search.set("page", String(page));
     search.set("page_size", "20");
-    if (kind !== "all") search.set("kind", kind);
     if (category) search.set("category", category);
     if (contactId) search.set("contact_id", contactId);
     if (debouncedQuery.trim()) search.set("q", debouncedQuery.trim());
     return `/api/recordings?${search.toString()}`;
-  }, [page, kind, category, contactId, debouncedQuery]);
+  }, [page, category, contactId, debouncedQuery]);
 
   const { data, loading, error, reload } = useApi<Paged<RecordingSummary>>(path, {
     pollMs: 12000,
@@ -49,7 +45,7 @@ export function RecordingsPage() {
   useEffect(() => {
     setPage(1);
     setItems([]);
-  }, [kind, category, contactId, debouncedQuery]);
+  }, [category, contactId, debouncedQuery]);
 
   useEffect(() => {
     if (!data) return;
@@ -94,20 +90,21 @@ export function RecordingsPage() {
       />
 
       <div className="toolbar">
-        <div className="segmented" role="group" aria-label="录音类型">
+        <div className="segmented segmented--small segmented--wrap" role="group" aria-label="录音分类">
           {(
             [
-              ["all", "全部"],
-              ["call", "通话"],
-              ["voice", "语音备忘"],
+              ["", "全部"],
+              ["呼入", "呼入"],
+              ["呼出", "呼出"],
+              ["语音备忘", "语音备忘"],
             ] as const
           ).map(([value, label]) => (
             <button
-              key={value}
+              key={value || "all"}
               type="button"
-              className={cx("segmented__item", kind === value && "is-active")}
-              onClick={() => setKind(value)}
-              aria-pressed={kind === value}
+              className={cx("segmented__item", category === value && "is-active")}
+              onClick={() => setCategory(value)}
+              aria-pressed={category === value}
             >
               {label}
             </button>
@@ -126,29 +123,6 @@ export function RecordingsPage() {
             <span aria-hidden="true">×</span>
           </button>
         ) : null}
-      </div>
-
-      <div className="toolbar toolbar--filters">
-        <div className="segmented segmented--small segmented--wrap" role="group" aria-label="录音方向">
-          {(
-            [
-              ["", "全部方向"],
-              ["呼入", "呼入"],
-              ["呼出", "呼出"],
-              ["语音备忘", "语音备忘"],
-            ] as const
-          ).map(([value, label]) => (
-            <button
-              key={value || "all"}
-              type="button"
-              className={cx("segmented__item", category === value && "is-active")}
-              onClick={() => setCategory(value)}
-              aria-pressed={category === value}
-            >
-              {label}
-            </button>
-          ))}
-        </div>
       </div>
 
       {error ? (
