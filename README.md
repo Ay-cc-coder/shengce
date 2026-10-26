@@ -424,7 +424,8 @@ docker项目/
 ├── scripts/              构建演示音频、截屏
 ├── tests/                后端测试
 ├── docs/                 架构说明、截图
-├── Dockerfile
+├── Dockerfile                 CPU 镜像
+├── Dockerfile.cuda            NVIDIA CUDA 镜像
 ├── docker-compose.yml        默认安装：拉取镜像，仅 3000
 ├── docker-compose.build.yml  可选：源码构建
 ├── docker-compose.gpu.yml    可选：NVIDIA CUDA 加速
