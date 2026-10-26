@@ -1,8 +1,16 @@
 # 声册 / Shengce
 
 [![docker](https://github.com/Ay-cc-coder/shengce/actions/workflows/docker.yml/badge.svg)](https://github.com/Ay-cc-coder/shengce/actions/workflows/docker.yml)
+[![iOS Release](https://github.com/Ay-cc-coder/shengce/actions/workflows/ios-release.yml/badge.svg)](https://github.com/Ay-cc-coder/shengce/actions/workflows/ios-release.yml)
 
 把 iPhone 上传的通话录音和语音备忘收进一台自己的服务器，自动整理成可以回听的对话、摘要和待办，并按联系人看清谁在频繁联系你。
+
+这个仓库同时包含配套的两部分：
+
+| 部分 | 位置 | 说明 |
+| --- | --- | --- |
+| **声册服务器** | 仓库根目录 | FastAPI + React，Docker 部署；WebDAV 接收、转写、摘要、待办和通话统计 |
+| **iPhone 端「录音监控」** | [`ios/`](ios/) | RootHide 越狱 App + root 守护进程，选择文件夹后通过 HTTPS WebDAV 上传；安装包在 `ios/packages/`，使用说明见 [`ios/README.md`](ios/README.md) |
 
 ![总览](docs/screenshots/01-overview-fold.jpg)
 
@@ -59,7 +67,7 @@ iPhone「录音监控」
 主 compose 文件就是 [`docker-compose.yml`](docker-compose.yml)，它只做三件事：拉取公开镜像、映射 3000 端口、挂载 `./data`。**不使用 80/443，也不启动 Caddy。**
 
 ```bash
-cd docker项目
+cd shengce
 # 先打开 docker-compose.yml，修改 ADMIN_PASSWORD 和 DAV_PASSWORD
 docker compose up -d
 ```
@@ -73,7 +81,7 @@ docker compose up -d
 
 ### 2. 在手机上接入
 
-1. 手机安装配套的「录音监控」插件（本仓库上一级的 iOS 项目）。
+1. 手机安装配套的「录音监控」插件（本仓库的 [`ios/`](ios/) 目录，安装步骤见 [`ios/README.md`](ios/README.md)）。
 2. 打开 App，填写：
    - WebDAV 地址：`https://你的域名/dav/`
    - 账号：`docker-compose.yml` 里的 `DAV_USERNAME`，默认 `audiowatch`
@@ -430,6 +438,28 @@ npm run shoot
 
 脚本使用本机 Google Chrome（Playwright Core），把截图写入 `docs/screenshots/`。
 
+### iOS 端
+
+源码在 [`ios/`](ios/)，构建需要 RootHide Theos 与 iPhoneOS SDK：
+
+```bash
+cd ios
+make clean
+make -j1 FINALPACKAGE=1
+make package FINALPACKAGE=1
+```
+
+- `THEOS` 默认 `~/theos`，可用 `make THEOS=/path/to/theos` 覆盖；
+- 架构为 arm64 + arm64e，产物在 `ios/packages/`；
+- App、守护进程与安装步骤见 [`ios/README.md`](ios/README.md)。
+
+发布 iOS 版本使用 `ios-v*` 标签，根目录的 [`ios-release.yml`](.github/workflows/ios-release.yml) 会自动创建 Release 并附上 `ios/packages/*.deb`：
+
+```bash
+git tag ios-v1.0.7
+git push origin ios-v1.0.7
+```
+
 ## API 一览
 
 | 方法 | 路径 | 说明 |
@@ -452,20 +482,21 @@ npm run shoot
 ## 目录
 
 ```text
-docker项目/
+shengce/
 ├── app/                  FastAPI、WebDAV、处理管线、SQLite
 ├── web/                  React + Vite 前端
 ├── demo/                 演示音频与转写夹具
 ├── scripts/              构建演示音频、截屏
 ├── tests/                后端测试
 ├── docs/                 架构说明、截图
+├── ios/                  iPhone 端「录音监控」：源码、安装包与截图
 ├── Dockerfile                 CPU 镜像
 ├── Dockerfile.cuda            NVIDIA CUDA 镜像
 ├── docker-compose.yml        默认安装：拉取镜像，仅 3000
 ├── docker-compose.build.yml  可选：源码构建
 ├── docker-compose.gpu.yml    可选：NVIDIA CUDA 加速
 ├── docker-compose.tls.yml    可选：Caddy 80/443
-├── .github/workflows/        GHCR 多架构镜像构建
+├── .github/workflows/        镜像构建（docker.yml）与 iOS Release（ios-release.yml）
 ├── Caddyfile
 ├── PRODUCT.md
 └── DESIGN.md

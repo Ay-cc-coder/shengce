@@ -68,10 +68,10 @@ AudioWatchDaemon (root, launchd KeepAlive)
 ## 构建
 
 ```bash
-cd 录音文件监控
+cd ios
 make clean
 make -j1 FINALPACKAGE=1
 make package FINALPACKAGE=1
 ```
 
-使用 RootHide Theos（`THEOS=~/theos`）。`-j1` 是刻意选择：Theos 的递归 make 在并行模式下可能死锁。产物在 `packages/`。
+使用 RootHide Theos（`THEOS=~/theos`）。`-j1` 是刻意选择：Theos 的递归 make 在并行模式下可能死锁。产物在 `ios/packages/`。

@@ -1,5 +1,6 @@
 .git
 .gitignore
+.github
 .env
 data
 .venv
@@ -9,5 +10,6 @@ __pycache__
 web/node_modules
 web/dist
 docs/screenshots
+ios
 *.md
 !PRODUCT.md

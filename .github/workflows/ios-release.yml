@@ -1,9 +1,9 @@
-name: Release
+name: iOS Release
 
 on:
   push:
     tags:
-      - 'v*'
+      - 'ios-v*'
 
 permissions:
   contents: write
@@ -17,11 +17,11 @@ jobs:
 
       - name: Verify package
         run: |
-          test -f packages/*.deb
-          sha256sum packages/*.deb
+          test -f ios/packages/*.deb
+          sha256sum ios/packages/*.deb
 
       - name: Create GitHub release
         uses: softprops/action-gh-release@v2
         with:
-          files: packages/*.deb
+          files: ios/packages/*.deb
           generate_release_notes: true

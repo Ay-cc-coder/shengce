@@ -1,5 +1,7 @@
 # 录音监控（RootHide）
 
+> **本目录是 [声册 / Shengce](../README.md) 仓库的 iPhone 客户端**，服务器端在仓库根目录。
+
 > **作者与开发方式**：项目所有者 **liseng** 负责需求、产品方向、设计审阅和实机验证；本项目代码由 **AI coding agent** 编写。详见 [AUTHORS.md](AUTHORS.md)。
 
 一个 RootHide 越狱插件/App：选择文件夹，先验证 HTTPS WebDAV，再把已有和新文件按**原文件名**上传；断网时保留队列，网络恢复后自动继续。关闭 App 后由 root 守护进程继续工作，空闲时不轮询文件夹。
@@ -10,8 +12,8 @@
 
 ## 安装
 
-GitHub 仓库：<https://github.com/Ay-cc-coder/audio-watch>  
-最新 Release：<https://github.com/Ay-cc-coder/audio-watch/releases/latest>
+GitHub 仓库：<https://github.com/Ay-cc-coder/shengce>  
+最新 Release：<https://github.com/Ay-cc-coder/shengce/releases/tag/ios-v1.0.6>
 
 ### 安装包
 
@@ -80,26 +82,27 @@ App 会保留你填写的服务器、账号、文件夹和密码；测试遗留�
 
 ## 发布到 GitHub
 
-项目已经发布到：
+iOS 端位于声册仓库的 `ios/` 目录：
 
-- 仓库：<https://github.com/Ay-cc-coder/audio-watch>
-- Release：<https://github.com/Ay-cc-coder/audio-watch/releases/tag/v1.0.6>
+- 仓库：<https://github.com/Ay-cc-coder/shengce>
+- Release：<https://github.com/Ay-cc-coder/shengce/releases/tag/ios-v1.0.6>
 
-后续发版：
+后续发版（在仓库根目录执行）：
 
 ```bash
-git add .
-git commit -m "release: 1.0.7"
-git tag v1.0.7
-git push origin main --tags
+git add ios/
+git commit -m "release: 录音监控 1.0.7"
+git push origin main
+git tag ios-v1.0.7
+git push origin ios-v1.0.7
 ```
 
-推送 `v*` tag 后，[.github/workflows/release.yml](.github/workflows/release.yml) 会自动创建 Release 并附上 `packages/*.deb`。更完整的首次发布/后续发版说明见 [docs/PUBLISH.md](docs/PUBLISH.md)。
+推送 `ios-v*` 标签后，根目录的 [`.github/workflows/ios-release.yml`](../.github/workflows/ios-release.yml) 会自动创建 Release 并附上 `ios/packages/*.deb`。更完整的说明见 [docs/PUBLISH.md](docs/PUBLISH.md)。
 
 ## 构建
 
 ```bash
-cd 录音文件监控
+cd ios
 make clean
 make -j1 FINALPACKAGE=1
 make package FINALPACKAGE=1

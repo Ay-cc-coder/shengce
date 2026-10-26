@@ -3,6 +3,17 @@ name: docker
 on:
   push:
     branches: [main]
+    paths:
+      - 'app/**'
+      - 'web/**'
+      - 'demo/**'
+      - 'scripts/**'
+      - 'Dockerfile'
+      - 'Dockerfile.cuda'
+      - 'Caddyfile'
+      - 'docker-compose*.yml'
+      - 'requirements*.txt'
+      - '.github/workflows/docker.yml'
     tags: ["v*"]
   workflow_dispatch:
 
