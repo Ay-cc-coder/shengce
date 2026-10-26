@@ -7,7 +7,7 @@ iOS 端位于声册仓库的 `ios/` 目录：
 
 服务器端与 iOS 端的发布相互独立：服务器镜像由 `.github/workflows/docker.yml` 构建，iOS 安装包由 `.github/workflows/ios-release.yml` 构建。
 
-> 旧的 `audio-watch` 仓库保留为历史版本；iOS 后续更新统一提交到声册仓库的 `ios/` 目录。
+> 旧的 `audio-watch` 仓库已删除；iOS 的历史提交与源码完整保留在本仓库的 `ios/` 目录。
 
 ## 1. 准备版本
 
