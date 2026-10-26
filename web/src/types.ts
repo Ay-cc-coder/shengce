@@ -256,6 +256,9 @@ export interface AIRule {
   match: string;
   kind: string | null;
   category: string | null;
+  direction: string | null;
+  device: string | null;
+  title_template: string | null;
   title: string | null;
   contact: string | null;
   enabled: boolean;

@@ -33,6 +33,22 @@ class Database:
             bind=self.engine, expire_on_commit=False, class_=Session
         )
         Base.metadata.create_all(self.engine)
+        self._migrate()
+
+    def _migrate(self) -> None:
+        with self.engine.begin() as connection:
+            rows = connection.exec_driver_sql("PRAGMA table_info(classification_rules)").fetchall()
+            columns = {row[1] for row in rows}
+            additions = {
+                "direction": "VARCHAR(8)",
+                "device": "VARCHAR(40)",
+                "title_template": "VARCHAR(200)",
+            }
+            for name, ddl in additions.items():
+                if name not in columns:
+                    connection.exec_driver_sql(
+                        f"ALTER TABLE classification_rules ADD COLUMN {name} {ddl}"
+                    )
 
     @contextmanager
     def session(self) -> Iterator[Session]:

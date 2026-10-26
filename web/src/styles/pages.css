@@ -2219,3 +2219,13 @@ a.file-row__title:hover {
   margin-bottom: 18px;
   justify-content: flex-start;
 }
+
+.rule-table__head,
+.rule-row {
+  grid-template-columns: minmax(120px, 1fr) 44px 64px minmax(72px, 0.55fr) minmax(120px, 1fr) 26px;
+}
+
+.rule-row .rule-row__title {
+  font-size: 9.5px;
+  color: var(--muted);
+}

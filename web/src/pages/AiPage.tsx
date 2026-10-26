@@ -341,18 +341,22 @@ export function AiPage() {
             <div className="rule-table">
               <div className="rule-table__head">
                 <span>匹配文件名</span>
+                <span>方向</span>
+                <span>设备</span>
                 <span>分类</span>
-                <span>标题</span>
+                <span>标题模板</span>
                 <span />
               </div>
               {rules.map((rule) => (
                 <div className="rule-row" key={rule.id}>
                   <span className="rule-row__match mono">{rule.match}</span>
+                  <span className={cx(!rule.direction && "muted")}>{rule.direction || "—"}</span>
+                  <span className={cx(!rule.device && "muted")}>{rule.device || "—"}</span>
                   <span>
                     <Tag tone="muted">{rule.category || KIND_LABELS[rule.kind || ""] || "未分类"}</Tag>
                   </span>
-                  <span className={cx("rule-row__title", !rule.title && "muted")}>
-                    {rule.title || "保留原规则"}
+                  <span className={cx("rule-row__title mono", !rule.title_template && "muted")}>
+                    {rule.title_template || rule.title || "{direction}-{device}-{contact}-{date}-{detail}"}
                   </span>
                   <button type="button" className="icon-btn" onClick={() => void removeRule(rule)} aria-label={`删除规则 ${rule.match}`}>
                     <Trash size={16} />
@@ -367,8 +371,8 @@ export function AiPage() {
           )}
 
           <p className="system-hint">
-            规则按“匹配文件名”做子串匹配；分类只改标题/类别，不会重写音频，也不会删除文件。
-            应用规则后，已有录音的新标题会立即显示在列表里。
+            规则只固定“文件名前缀 / 呼入或呼出 / 设备 / 分类”；联系人和日期是每个文件的变量，
+            应用时从文件名和录音时间提取，再套进标题模板。规则不会重写音频，也不会删除文件。
           </p>
         </section>
       </div>

@@ -19,18 +19,23 @@ logger = logging.getLogger(__name__)
 
 ALLOWED_KINDS = {"call", "voice", "audio", "document", "image", "video", "archive", "other"}
 
-SYSTEM_PROMPT = """你是一个录音文件命名分类助手。用户会给出一批文件名样本。
-请归纳少量稳定的“词表规则”，把文件名中的平台/来源前缀映射成录音分类。规则会用于以后的新文件，避免每个文件都调用 AI。
+SYSTEM_PROMPT = """你是一个录音文件命名分类助手。用户会给出一批文件名样本（以及去重后的命名模式）。
+请归纳稳定的“词表规则”，让程序以后不用每条都调用 AI。规则只需要识别文件名中的前缀、方向和设备；
+联系人姓名、日期、详细内容都是每个文件不同的变量，不能固化在规则里。
 
 要求：
-1. match 必须是文件名中稳定出现的短子串，1-24 个字符；不要包含日期、UUID、随机数字、联系人姓名。
-2. 不要把每个联系人单独做成规则；联系人由程序从文件名里提取。
-3. kind 只能是 call、voice、audio、document、image、video、archive、other。
-4. category 是 2-12 个汉字，例如“微信来电”“微信呼出”“CallKit 来电”“普通通话”“语音备忘”。
-5. title 可选，是不超过 24 字的统一标题；可以用 {contact} 占位，但不要强行编造联系人。
-6. 最多返回 20 条规则，按优先级从高到低。
-7. 只返回 JSON，不要 Markdown。格式：
-{"rules":[{"match":"CallKit音频","kind":"call","category":"CallKit 来电","title":"CallKit 来电"}]}
+1. match 必须是文件名中稳定出现的短子串，1-24 个字符；不要包含日期、UUID、随机数字、联系人姓名或 wxid。
+2. direction 只能是：呼入、呼出、未知。文件名有“来电/呼入”就是呼入，有“呼出/拨出”就是呼出；CallKit 音频通常按呼入。
+3. device 是拨打的设备/平台：移动、联通、电信、CallKit、微信、微信视频、小1、小2、FaceTime、电话等；用文件名里真实出现的。
+4. kind 只能是 call、voice、audio、document、image、video、archive、other。
+5. category 是 2-12 个汉字；通话建议直接用“呼入”或“呼出”，语音备忘用“语音备忘”。
+6. title_template 使用占位符，默认必须是：
+   {direction}-{device}-{contact}-{date}-{detail}
+   不要写死具体人名或日期，不要改写这个模板。
+7. 不要为每个联系人单独建规则；联系人由程序从括号等位置提取。
+8. 覆盖所有不同的文件名前缀，最多返回 30 条规则。
+9. 只返回 JSON，不要 Markdown。格式：
+{"rules":[{"match":"CallKit音频","direction":"呼入","device":"CallKit","kind":"call","category":"呼入","title_template":"{direction}-{device}-{contact}-{date}-{detail}"}]}
 """
 
 
@@ -166,16 +171,25 @@ def _validated_rules(payload: dict[str, Any]) -> list[dict[str, Any]]:
         kind = str(item.get("kind") or "").strip().lower()
         if kind not in ALLOWED_KINDS:
             kind = ""
+        direction = str(item.get("direction") or "").strip()
+        if direction not in {"呼入", "呼出", "未知"}:
+            direction = ""
         rule = {
             "match": match,
             "kind": kind or None,
             "category": truncate(str(item.get("category") or "").strip(), 40) or None,
-            "title": truncate(str(item.get("title") or "").strip(), 120) or None,
+            "direction": direction or None,
+            "device": truncate(str(item.get("device") or "").strip(), 40) or None,
+            "title_template": truncate(
+                str(item.get("title_template") or "{direction}-{device}-{contact}-{date}-{detail}").strip(),
+                200,
+            ),
+            "title": truncate(str(item.get("title") or "").strip(), 200) or None,
             "contact": truncate(str(item.get("contact") or "").strip(), 120) or None,
         }
         rules.append(rule)
         seen.add(match)
-        if len(rules) >= 20:
+        if len(rules) >= 30:
             break
     return rules
 
@@ -185,18 +199,29 @@ def generate_rules(db: Database, settings: Settings) -> dict[str, Any]:
         names = [
             row
             for row in session.scalars(
-                select(FileRecord.name).order_by(FileRecord.uploaded_at.desc()).limit(80)
+                select(FileRecord.name).order_by(FileRecord.uploaded_at.desc()).limit(5000)
             ).all()
         ]
+    if not names:
+        raise RuntimeError("还没有录音文件，无法生成规则。")
+    import re
+
     unique: list[str] = []
     seen: set[str] = set()
     for name in names:
-        if name not in seen:
+        pattern = re.sub(r"\{[^}]*\}|\[[^\]]*\]", " ", name)
+        pattern = re.sub(
+            r"20\d{2}[-_.年]?\d{1,2}[-_.月]?\d{1,2}|\d{2,4}[-_.]\d{1,2}[-_.]\d{1,2}",
+            " ",
+            pattern,
+        )
+        pattern = re.sub(r"wxid[_\s]*[A-Za-z0-9]+", " ", pattern, flags=re.IGNORECASE)
+        pattern = re.sub(r"\d+", "#", pattern)
+        pattern = re.sub(r"\s+", " ", pattern).strip()
+        if pattern and pattern not in seen:
+            seen.add(pattern)
             unique.append(name)
-            seen.add(name)
-    if not unique:
-        raise RuntimeError("还没有录音文件，无法生成规则。")
-    sample = "\n".join(unique[:80])
+    sample = "\n".join(unique[:300])
     content = chat(
         settings,
         [
@@ -223,6 +248,9 @@ def generate_rules(db: Database, settings: Settings) -> dict[str, Any]:
                 session.add(existing)
             existing.kind = rule["kind"]
             existing.category = rule["category"]
+            existing.direction = rule["direction"]
+            existing.device = rule["device"]
+            existing.title_template = rule["title_template"]
             existing.title = rule["title"]
             existing.contact = rule["contact"]
             existing.enabled = True
@@ -243,6 +271,9 @@ def list_rules(db: Database) -> list[dict[str, Any]]:
                 "match": row.match,
                 "kind": row.kind,
                 "category": row.category,
+                "direction": row.direction,
+                "device": row.device,
+                "title_template": row.title_template,
                 "title": row.title,
                 "contact": row.contact,
                 "enabled": row.enabled,
