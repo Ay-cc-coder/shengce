@@ -17,7 +17,7 @@ from .ingest import apply_document_metadata
 from .llm import analyse_with_llm
 from .media import analyse_audio
 from .models import ActionItem, Contact, FileRecord, Segment, utcnow
-from .transcribe import transcribe_audio
+from .transcribe import ThermalPause, transcribe_audio
 from .utils import (
     KIND_CATEGORY,
     local_zone,
@@ -229,6 +229,15 @@ def process_file(db: Database, settings: Settings, file_id: str) -> None:
             )
         else:
             _process_file_asset(db, file_id, path)
+    except ThermalPause as exc:
+        logger.warning("cooling pause for %s: %s", rel_name, exc)
+        with db.session() as session:
+            record = session.get(FileRecord, file_id)
+            if record:
+                record.status = "queued"
+                record.stage = "cooling"
+                record.error = None
+        return
     except Exception as exc:
         message = str(exc) if isinstance(exc, RuntimeError) else "处理时遇到错误，请重试。"
         logger.exception("processing failed for %s: %s", rel_name, exc)

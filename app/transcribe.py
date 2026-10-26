@@ -3,7 +3,10 @@ from __future__ import annotations
 import json
 import logging
 import re
+import shutil
+import subprocess
 import threading
+import time
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -14,6 +17,13 @@ logger = logging.getLogger(__name__)
 _model = None
 _model_lock = threading.Lock()
 _model_key: tuple[str, str, str, int, int] | None = None
+_temp_checked_at = 0.0
+_temp_value: float | None = None
+_temp_lock = threading.Lock()
+
+
+class ThermalPause(Exception):
+    """Raised when the GPU is too hot to continue a transcription."""
 
 
 @dataclass
@@ -30,6 +40,46 @@ class Transcription:
     model: str = ""
     source: str = "faster-whisper"
     text: str = ""
+
+
+def _gpu_temperature(settings: Settings) -> float | None:
+    global _temp_checked_at, _temp_value
+    if settings.whisper_device != "cuda":
+        return None
+    with _temp_lock:
+        now = time.monotonic()
+        if now - _temp_checked_at < 5:
+            return _temp_value
+    executable = shutil.which("nvidia-smi")
+    if not executable:
+        return None
+    try:
+        result = subprocess.run(
+            [
+                executable,
+                "--query-gpu=temperature.gpu",
+                "--format=csv,noheader,nounits",
+            ],
+            capture_output=True,
+            text=True,
+            timeout=8,
+        )
+        value: float | None = float(result.stdout.strip().splitlines()[0])
+    except (OSError, subprocess.TimeoutExpired, ValueError, IndexError):
+        value = None
+    with _temp_lock:
+        if value is not None:
+            _temp_value = value
+        _temp_checked_at = time.monotonic()
+    return value
+
+
+def _ensure_cool_enough(settings: Settings) -> None:
+    temperature = _gpu_temperature(settings)
+    if temperature is not None and temperature >= settings.gpu_temp_pause:
+        raise ThermalPause(
+            f"GPU 温度 {temperature:.0f}°C，达到 {settings.gpu_temp_pause}°C，暂停降温"
+        )
 
 
 def _clean_text(text: str) -> str:
@@ -153,6 +203,7 @@ def transcribe_audio(path: Path, settings: Settings) -> Transcription:
     if settings.asr_engine == "off":
         return Transcription(segments=[], language="zh", model="off", source="off", text="")
 
+    _ensure_cool_enough(settings)
     model = _load_model(settings)
     language = settings.whisper_language or None
     prompt = settings.whisper_prompt if language and language.startswith("zh") else None
@@ -170,6 +221,7 @@ def transcribe_audio(path: Path, settings: Settings) -> Transcription:
     )
     segments: list[TranscriptSegment] = []
     for item in segments_iter:
+        _ensure_cool_enough(settings)
         text = _clean_text(item.text)
         if not text:
             continue
