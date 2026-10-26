@@ -10,7 +10,7 @@ from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
 
 from .db import Database
-from .models import ActionItem, Contact, FileRecord, Segment, utcnow
+from .models import ActionItem, ClassificationRule, Contact, FileRecord, Segment, utcnow
 from .utils import (
     KIND_CATEGORY,
     is_probe_file,
@@ -103,6 +103,56 @@ def initial_kind(name: str, ext: str) -> str:
     if any(hint in lower for hint in VOICE_HINTS):
         return "voice"
     return "audio"
+
+
+def _classification_rule(session: Session, name: str) -> ClassificationRule | None:
+    lower = name.lower()
+    rows = session.scalars(
+        select(ClassificationRule)
+        .where(ClassificationRule.enabled.is_(True))
+        .order_by(ClassificationRule.priority.desc(), ClassificationRule.created_at.asc())
+    ).all()
+    for rule in rows:
+        if rule.match and rule.match.lower() in lower:
+            return rule
+    return None
+
+
+def _apply_classification_rule(
+    session: Session, record: FileRecord, rule: ClassificationRule
+) -> None:
+    if rule.kind and rule.kind in KIND_CATEGORY:
+        record.kind = rule.kind
+        record.category = KIND_CATEGORY.get(rule.kind, record.category)
+    if rule.category:
+        record.category = rule.category
+    if rule.contact:
+        contact = create_contact(session, rule.contact)
+        record.contact_id = contact.id
+    if rule.title:
+        contact_name = None
+        if record.contact_id:
+            contact_obj = session.get(Contact, record.contact_id)
+            contact_name = contact_obj.name if contact_obj else None
+        title = rule.title.replace("{contact}", contact_name or "").strip(" -·")
+        if title:
+            record.title = title[:80]
+
+
+def apply_rules_to_existing(db: Database) -> int:
+    changed = 0
+    with db.session() as session:
+        rows = session.scalars(select(FileRecord)).all()
+        for record in rows:
+            rule = _classification_rule(session, record.name)
+            if rule is None:
+                continue
+            before = (record.kind, record.category, record.title, record.contact_id)
+            _apply_classification_rule(session, record, rule)
+            after = (record.kind, record.category, record.title, record.contact_id)
+            if after != before:
+                changed += 1
+    return changed
 
 
 def _reset_analysis(session: Session, record: FileRecord) -> None:
@@ -199,6 +249,9 @@ def upsert_file(
         else:
             title = guessed_title or truncate(stem, 60)
         record.title = title
+        rule = _classification_rule(session, name)
+        if rule is not None:
+            _apply_classification_rule(session, record, rule)
 
         session.flush()
         record_id = record.id

@@ -4,6 +4,7 @@ import {
   Gauge,
   GearSix,
   House,
+  Sparkle,
   PhoneCall,
   SignOut,
   Waveform,
@@ -63,6 +64,9 @@ export function Sidebar() {
           <NavLink to="/system" className="icon-btn" aria-label="运行状态">
             <Gauge size={19} />
           </NavLink>
+          <NavLink to="/ai" className="icon-btn" aria-label="AI 分类">
+            <Sparkle size={19} />
+          </NavLink>
           <NavLink to="/setup" className="icon-btn" aria-label="接入手机">
             <GearSix size={19} />
           </NavLink>
@@ -108,6 +112,10 @@ export function Sidebar() {
           <NavLink to="/system" className="sidebar__setup">
             <Gauge size={17} aria-hidden="true" />
             <span>运行状态</span>
+          </NavLink>
+          <NavLink to="/ai" className="sidebar__setup">
+            <Sparkle size={17} aria-hidden="true" />
+            <span>AI 分类</span>
           </NavLink>
           <NavLink to="/setup" className="sidebar__setup">
             <GearSix size={17} aria-hidden="true" />

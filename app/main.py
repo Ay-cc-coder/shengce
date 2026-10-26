@@ -13,6 +13,7 @@ from fastapi.responses import FileResponse, JSONResponse
 from starlette.middleware.base import BaseHTTPMiddleware
 
 from . import __version__
+from .ai_config import load_ai_config
 from .auth import COOKIE_NAME, LoginLimiter, verify_session
 from .config import Settings, load_settings
 from .db import init_database
@@ -20,6 +21,7 @@ from .dav import router as dav_router
 from .ingest import scan_library
 from .pipeline import PipelineWorker
 from .routes.actions import router as actions_router
+from .routes.ai import router as ai_router
 from .routes.auth_routes import router as auth_router
 from .routes.contacts import router as contacts_router
 from .routes.dashboard import router as dashboard_router
@@ -88,6 +90,7 @@ async def lifespan(app: FastAPI):
     app.state.db = db
     app.state.limiter = LoginLimiter()
     runtime = load_runtime(settings)
+    app.state.ai_provider = load_ai_config(settings).get("provider", "custom")
     logger.info(
         "ASR runtime: device=%s model=%s compute=%s paused=%s",
         settings.whisper_device,
@@ -153,6 +156,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(contacts_router)
     app.include_router(files_router)
     app.include_router(setup_router)
+    app.include_router(ai_router)
     app.include_router(system_router)
     app.include_router(upload_router)
     app.include_router(dav_router)

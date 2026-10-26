@@ -45,6 +45,21 @@ class Contact(Base):
     files: Mapped[list["FileRecord"]] = relationship(back_populates="contact")
 
 
+class ClassificationRule(Base):
+    __tablename__ = "classification_rules"
+
+    id: Mapped[str] = mapped_column(String(32), primary_key=True, default=new_id)
+    match: Mapped[str] = mapped_column(String(120), unique=True, index=True)
+    kind: Mapped[Optional[str]] = mapped_column(String(24), nullable=True)
+    category: Mapped[Optional[str]] = mapped_column(String(40), nullable=True)
+    title: Mapped[Optional[str]] = mapped_column(String(120), nullable=True)
+    contact: Mapped[Optional[str]] = mapped_column(String(120), nullable=True)
+    priority: Mapped[int] = mapped_column(Integer, default=0)
+    enabled: Mapped[bool] = mapped_column(Boolean, default=True, index=True)
+    source: Mapped[str] = mapped_column(String(16), default="ai")
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+
+
 class FileRecord(Base):
     __tablename__ = "files"
     __table_args__ = (UniqueConstraint("rel_path", name="uq_files_rel_path"),)

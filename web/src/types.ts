@@ -242,3 +242,22 @@ export interface SystemInfo {
   };
   timestamp: string;
 }
+
+export interface AIConfig {
+  provider: string;
+  base_url: string;
+  model: string;
+  has_key: boolean;
+  key_hint: string;
+}
+
+export interface AIRule {
+  id: string;
+  match: string;
+  kind: string | null;
+  category: string | null;
+  title: string | null;
+  contact: string | null;
+  enabled: boolean;
+  source: string;
+}

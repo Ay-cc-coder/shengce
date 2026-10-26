@@ -163,3 +163,37 @@ def test_system_rejects_gpu_on_cpu_image(client: TestClient) -> None:
     )
     assert response.status_code == 200
     assert response.json()["asr"]["model"] == "base"
+
+
+def test_ai_config_and_rule_application(client: TestClient) -> None:
+    saved = client.put(
+        "/api/ai/config",
+        json={
+            "provider": "custom",
+            "base_url": "https://example.com/v1",
+            "api_key": "sk-test-1234",
+            "model": "test-model",
+        },
+    )
+    assert saved.status_code == 200
+    assert saved.json()["has_key"] is True
+    assert saved.json()["key_hint"].endswith("1234")
+
+    from app.models import ClassificationRule
+
+    with client.app.state.db.session() as session:
+        session.add(
+            ClassificationRule(
+                match="陈岚",
+                kind="call",
+                category="AI 测试分类",
+                title="AI 测试标题",
+                enabled=True,
+                source="manual",
+            )
+        )
+    applied = client.post("/api/ai/rules/apply")
+    assert applied.status_code == 200
+    assert applied.json()["changed"] >= 1
+    rules = client.get("/api/ai/rules").json()["items"]
+    assert any(rule["match"] == "陈岚" for rule in rules)
