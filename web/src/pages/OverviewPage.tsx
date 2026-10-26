@@ -138,7 +138,7 @@ export function OverviewPage() {
             <div className="section-heading">
               <h2>需要你处理</h2>
             </div>
-            <p className="attention__empty-text">待办会从录音摘要里整理出来，出现在这里。</p>
+            <p className="attention__empty-text">在录音对话里点“+ 待办”，添加的事项会出现在这里。</p>
           </aside>
         </div>
         <section className="section">

@@ -13,11 +13,13 @@ export function ChatTranscript({
   currentTime,
   focusIdx,
   onSeek,
+  onAddAction,
 }: {
   recording: RecordingDetail;
   currentTime: number;
   focusIdx?: number | null;
   onSeek: (time: number) => void;
+  onAddAction?: (segment: RecordingDetail["segments"][number]) => void;
 }) {
   const refs = useRef<Record<number, HTMLDivElement | null>>({});
   const activeIdx = useMemo(() => {
@@ -94,6 +96,15 @@ export function ChatTranscript({
                 </button>
               </div>
               <p className="chat-turn__bubble">{segment.text}</p>
+              {onAddAction ? (
+                <button
+                  type="button"
+                  className="chat-turn__todo"
+                  onClick={() => onAddAction(segment)}
+                >
+                  + 待办
+                </button>
+              ) : null}
             </div>
           </div>
         );

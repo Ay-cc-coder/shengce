@@ -2229,3 +2229,51 @@ a.file-row__title:hover {
   font-size: 9.5px;
   color: var(--muted);
 }
+
+.action-draft {
+  margin-bottom: 18px;
+}
+
+.action-draft__top {
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) minmax(160px, 0.6fr);
+  gap: 12px;
+}
+
+.action-draft__quote {
+  margin-top: 10px;
+  color: var(--muted);
+  font-family: var(--font-serif);
+  font-size: 12px;
+  line-height: 1.7;
+}
+
+.chat-turn__todo {
+  margin-top: 6px;
+  padding: 2px 0;
+  border: 0;
+  background: none;
+  color: var(--muted-2);
+  font-size: 10px;
+  opacity: 0;
+  transition: opacity 0.15s ease, color 0.15s ease;
+}
+
+.chat-turn:hover .chat-turn__todo,
+.chat-turn__todo:focus-visible {
+  opacity: 1;
+}
+
+.chat-turn__todo:hover {
+  color: var(--amber-deep);
+}
+
+@media (max-width: 760px) {
+  .action-draft__top {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .chat-turn__todo {
+    opacity: 1;
+  }
+}

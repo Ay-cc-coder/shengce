@@ -10,6 +10,7 @@ from pathlib import Path
 from fastapi import FastAPI, Request
 from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import FileResponse, JSONResponse
+from sqlalchemy import delete
 from starlette.middleware.base import BaseHTTPMiddleware
 
 from . import __version__
@@ -20,6 +21,7 @@ from .config import Settings, load_settings
 from .db import init_database
 from .dav import router as dav_router
 from .ingest import scan_library
+from .models import ActionItem
 from .pipeline import PipelineWorker
 from .routes.actions import router as actions_router
 from .routes.ai import router as ai_router
@@ -91,6 +93,9 @@ async def lifespan(app: FastAPI):
     app.state.db = db
     app.state.limiter = LoginLimiter()
     cleanup_rules(app.state.db)
+    if not settings.demo_mode:
+        with db.session() as session:
+            session.execute(delete(ActionItem).where(ActionItem.source != "user"))
     runtime = load_runtime(settings)
     app.state.ai_provider = load_ai_config(settings).get("provider", "custom")
     logger.info(

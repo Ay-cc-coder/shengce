@@ -16,7 +16,7 @@ from .db import Database
 from .ingest import apply_document_metadata
 from .llm import analyse_with_llm
 from .media import analyse_audio
-from .models import ActionItem, Contact, FileRecord, Segment, utcnow
+from .models import Contact, FileRecord, Segment, utcnow
 from .transcribe import ThermalPause, transcribe_audio
 from .utils import (
     KIND_CATEGORY,
@@ -342,7 +342,7 @@ def _process_audio(
         if not record:
             return
         session.execute(delete(Segment).where(Segment.file_id == file_id))
-        session.execute(delete(ActionItem).where(ActionItem.file_id == file_id))
+        # Keep user-created todos; only the transcript is rebuilt.
         for index, turn in enumerate(turns):
             session.add(
                 Segment(
@@ -370,20 +370,7 @@ def _process_audio(
             record.speakers = {"1": "说话人 1"}
         else:
             record.speakers = {"1": "说话人 1", "2": "说话人 2"}
-        for action in analysis.actions:
-            session.add(
-                ActionItem(
-                    file_id=file_id,
-                    text=action.text,
-                    detail=action.detail,
-                    due_date=action.due_date,
-                    due_label=action.due_label,
-                    priority=action.priority,
-                    segment_idx=action.segment_idx,
-                    segment_start=action.segment_start,
-                    source=analysis.source,
-                )
-            )
+        # Todos are created explicitly by the user from transcript text.
         record.status = "ready"
         record.stage = "done"
         record.error = None

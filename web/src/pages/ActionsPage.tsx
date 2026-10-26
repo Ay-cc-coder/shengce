@@ -105,7 +105,7 @@ export function ActionsPage() {
             </button>
           ))}
         </div>
-        <span className="toolbar__hint">从通话和语音备忘里整理，勾选后不会删除原录音。</span>
+        <span className="toolbar__hint">在录音对话里手动添加待办，勾选完成不会删除原录音。</span>
       </div>
 
       {error ? (
@@ -134,7 +134,7 @@ export function ActionsPage() {
           <p>
             {filter === "done"
               ? "完成的待办会留在这里，方便回看这段时间处理过什么。"
-              : "当对话里出现明确的请求、承诺或预约时，会自动整理到这里。"}
+              : "在录音对话里点“+ 待办”，写给谁、做什么、什么时候完成，添加后会显示在这里。"}
           </p>
         </EmptyState>
       ) : null}
@@ -163,7 +163,7 @@ export function ActionsPage() {
       </div>
 
       <p className="page-footnote">
-        待办由录音内容自动整理，可能把对方的事也算进来。勾选前请看一眼原话。
+        待办需要你从录音对话里手动添加；不会再把每段录音自动变成待办。
       </p>
     </div>
   );

@@ -258,3 +258,24 @@ def test_nickname_contact_fallback() -> None:
     )
     assert fields["contact"] == "何以言辞"
     assert fields["title"] == "呼入-微信-何以言辞-2026-10-27-通话录音"
+
+
+def test_create_manual_todo_from_recording(client: TestClient) -> None:
+    listing = client.get("/api/recordings?page_size=1").json()
+    recording = listing["items"][0]
+    response = client.post(
+        f"/api/recordings/{recording['id']}/actions",
+        json={
+            "text": "给老妈回电话",
+            "detail": "给老妈回电话",
+            "due_date": "2026-10-30",
+            "segment_idx": 0,
+            "segment_start": 0.0,
+        },
+    )
+    assert response.status_code == 200
+    item = response.json()["item"]
+    assert item["source"] == "user"
+    assert item["due_date"] == "2026-10-30"
+    actions = client.get("/api/actions?status=open").json()
+    assert any(action["id"] == item["id"] for action in actions["items"])

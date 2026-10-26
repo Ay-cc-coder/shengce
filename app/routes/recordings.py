@@ -12,7 +12,10 @@ from sqlalchemy import func, or_, select
 from sqlalchemy.orm import selectinload
 
 from ..ingest import create_contact, queue_reprocess
-from ..models import Contact, FileRecord, Segment, utcnow
+from datetime import date as date_type
+
+from ..models import ActionItem, Contact, FileRecord, Segment, utcnow
+from ..serializers import action_dict
 from ..serializers import file_detail, file_summary
 
 router = APIRouter(prefix="/api/recordings", tags=["recordings"])
@@ -247,3 +250,42 @@ def download(request: Request, file_id: str) -> FileResponse:
     if not path.exists():
         raise HTTPException(status_code=404, detail="文件不在资料库中。")
     return FileResponse(path, filename=name)
+
+
+class ActionCreate(BaseModel):
+    text: str = Field(min_length=1, max_length=240)
+    detail: Optional[str] = Field(default=None, max_length=500)
+    due_date: Optional[str] = None
+    segment_idx: Optional[int] = Field(default=None, ge=0)
+    segment_start: Optional[float] = Field(default=None, ge=0)
+
+
+@router.post("/{file_id}/actions")
+def create_recording_action(request: Request, file_id: str, body: ActionCreate) -> dict:
+    db = _db(request)
+    due = None
+    if body.due_date:
+        try:
+            due = date_type.fromisoformat(body.due_date)
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail="日期格式应为 YYYY-MM-DD。") from exc
+    with db.session() as session:
+        record = session.get(FileRecord, file_id)
+        if not record:
+            raise HTTPException(status_code=404, detail="录音不存在。")
+        action = ActionItem(
+            file_id=file_id,
+            text=body.text.strip(),
+            detail=body.detail.strip() if body.detail else None,
+            due_date=due,
+            due_label=None,
+            priority="normal",
+            segment_idx=body.segment_idx,
+            segment_start=body.segment_start,
+            source="user",
+        )
+        session.add(action)
+        session.flush()
+        session.refresh(action, ["file"])
+        payload = action_dict(action, _tz(request), with_file=True)
+    return {"item": payload}

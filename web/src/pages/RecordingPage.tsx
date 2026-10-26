@@ -13,6 +13,7 @@ import {
   Pause,
   ArrowsClockwise,
   Headphones,
+  Plus,
 } from "@phosphor-icons/react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
 import { api } from "../lib/api";
@@ -60,6 +61,15 @@ export function RecordingPage() {
   const [contactName, setContactName] = useState("");
   const [saving, setSaving] = useState(false);
   const [reprocessing, setReprocessing] = useState(false);
+  const [actionDraft, setActionDraft] = useState<{
+    text: string;
+    detail: string;
+    segment_idx: number | null;
+    segment_start: number | null;
+  } | null>(null);
+  const [actionDate, setActionDate] = useState("");
+  const [actionSaving, setActionSaving] = useState(false);
+  const actionDraftRef = useRef<HTMLDivElement | null>(null);
   const applied = useRef<string | null>(null);
 
   const { data, loading, error, reload, setData } = useApi<RecordingDetail>(
@@ -73,6 +83,48 @@ export function RecordingPage() {
     return () => window.clearInterval(timer);
   }, [data?.status, reload]);
   const contactsQuery = useApi<ContactsResponse>(contactOpen ? "/api/contacts" : null);
+
+  const openActionDraft = (segment?: RecordingDetail["segments"][number]) => {
+    setActionDraft({
+      text: segment?.text || "",
+      detail: segment?.text || "",
+      segment_idx: segment?.idx ?? null,
+      segment_start: segment?.start ?? null,
+    });
+    setActionDate("");
+  };
+
+  useEffect(() => {
+    if (actionDraft) {
+      actionDraftRef.current?.scrollIntoView({ block: "center", behavior: "smooth" });
+    }
+  }, [actionDraft]);
+
+  const saveAction = async () => {
+    if (!data || !actionDraft || !actionDraft.text.trim()) {
+      toast.show("先写一下待办内容。", "error");
+      return;
+    }
+    setActionSaving(true);
+    try {
+      await api.post(`/api/recordings/${data.id}/actions`, {
+        text: actionDraft.text.trim(),
+        detail: actionDraft.detail || null,
+        due_date: actionDate || null,
+        segment_idx: actionDraft.segment_idx,
+        segment_start: actionDraft.segment_start,
+      });
+      setActionDraft(null);
+      setActionDate("");
+      await reload();
+      window.dispatchEvent(new Event("shengce:refresh"));
+      toast.show("已加入待办。", "success");
+    } catch (err) {
+      toast.show(err instanceof Error ? err.message : "保存待办失败。", "error");
+    } finally {
+      setActionSaving(false);
+    }
+  };
 
   useEffect(() => {
     if (data) document.title = `${data.title} · 声册`;
@@ -478,6 +530,41 @@ export function RecordingPage() {
         </section>
       ) : null}
 
+      {actionDraft ? (
+        <div className="inline-panel action-draft" ref={actionDraftRef}>
+          <div className="action-draft__top">
+            <label className="field">
+              <span className="field__label">待办内容</span>
+              <input
+                value={actionDraft.text}
+                onChange={(event) =>
+                  setActionDraft((current) => (current ? { ...current, text: event.target.value } : current))
+                }
+                placeholder="例如：给老妈回电话"
+                autoFocus
+              />
+            </label>
+            <label className="field">
+              <span className="field__label">截止日期（可选）</span>
+              <input
+                type="date"
+                value={actionDate}
+                onChange={(event) => setActionDate(event.target.value)}
+              />
+            </label>
+          </div>
+          {actionDraft.detail ? <p className="action-draft__quote">“{actionDraft.detail}”</p> : null}
+          <div className="inline-panel__actions">
+            <button type="button" className="btn btn--primary btn--small" onClick={() => void saveAction()} disabled={actionSaving}>
+              {actionSaving ? "保存中" : "保存待办"}
+            </button>
+            <button type="button" className="btn btn--ghost btn--small" onClick={() => setActionDraft(null)}>
+              取消
+            </button>
+          </div>
+        </div>
+      ) : null}
+
       <div className="recording-layout">
         <div className="recording-main">
           <section className="section transcript-section" aria-label="录音对话">
@@ -575,6 +662,7 @@ export function RecordingPage() {
                 currentTime={isCurrent ? player.time : -1}
                 focusIdx={focusIdx}
                 onSeek={chatSeek}
+                onAddAction={openActionDraft}
               />
             ) : data.status === "failed" ? (
               <EmptyState
@@ -631,6 +719,11 @@ export function RecordingPage() {
             <div className="section-heading section-heading--tight">
               <h2>需要你处理</h2>
               <span className="section-count">{data.action_open}</span>
+              <div className="section-heading__spacer" />
+              <button type="button" className="btn btn--ghost btn--small" onClick={() => openActionDraft()}>
+                <Plus size={14} aria-hidden="true" />
+                添加待办
+              </button>
             </div>
             {data.actions.length ? (
               <div className="rail-actions">
