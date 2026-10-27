@@ -28,7 +28,8 @@ def get_system(request: Request) -> dict:
 
 
 class ASRUpdate(BaseModel):
-    device: str = Field(pattern="^(cpu|cuda)$")
+    engine: str = Field(default="faster", pattern="^(faster|sensevoice)$")
+    device: str = Field(default="cpu", pattern="^(cpu|cuda)$")
     device_index: int = Field(default=0, ge=0, le=16)
     model: Optional[str] = Field(default=None, max_length=40)
 
@@ -36,6 +37,24 @@ class ASRUpdate(BaseModel):
 @router.post("/asr")
 def update_asr(request: Request, body: ASRUpdate) -> dict:
     settings = request.app.state.settings
+    if body.engine == "sensevoice":
+        data = save_runtime(
+            settings,
+            engine="sensevoice",
+            device="cpu",
+            device_index=0,
+            model="sensevoice-small",
+            compute_type="int8",
+        )
+        apply_runtime(settings, data)
+        reset_model()
+        try:
+            from ..sensevoice import reset_model as reset_sensevoice
+
+            reset_sensevoice()
+        except Exception:
+            pass
+        return _payload(request)
     model = (body.model or settings.whisper_model).strip()
     if model not in ALLOWED_MODELS:
         raise HTTPException(status_code=422, detail=f"不支持的模型：{model}")
@@ -53,6 +72,7 @@ def update_asr(request: Request, body: ASRUpdate) -> dict:
     compute_type = "float16" if body.device == "cuda" else "int8"
     data = save_runtime(
         settings,
+        engine="faster",
         device=body.device,
         device_index=body.device_index,
         model=model,

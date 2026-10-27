@@ -196,6 +196,7 @@ export interface SystemGpu {
 
 export interface SystemInfo {
   asr: {
+    engine: "faster" | "sensevoice";
     device: "cpu" | "cuda";
     device_index: number;
     model: string;

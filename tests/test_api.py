@@ -312,3 +312,22 @@ def test_bad_transcript_bulk_reprocess(client: TestClient) -> None:
         row = session.get(FileRecord, file_id)
         assert row.status == "queued"
     assert client.get("/api/recordings/bad/count").json()["count"] == 0
+
+
+def test_switch_to_sensevoice_engine(client: TestClient) -> None:
+    response = client.post(
+        "/api/system/asr",
+        json={"engine": "sensevoice", "device": "cpu", "device_index": 0, "model": "small"},
+    )
+    assert response.status_code == 200
+    payload = response.json()["asr"]
+    assert payload["engine"] == "sensevoice"
+    assert payload["model"] == "sensevoice-small"
+    assert payload["device"] == "cpu"
+
+    back = client.post(
+        "/api/system/asr",
+        json={"engine": "faster", "device": "cpu", "device_index": 0, "model": "small"},
+    )
+    assert back.status_code == 200
+    assert back.json()["asr"]["engine"] == "faster"

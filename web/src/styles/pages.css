@@ -2314,3 +2314,12 @@ a.file-row__title:hover {
     margin-left: 30px;
   }
 }
+
+.engine-field {
+  max-width: 360px;
+  margin-bottom: 16px;
+}
+
+.sensevoice-note {
+  margin-top: 4px;
+}

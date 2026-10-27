@@ -202,6 +202,10 @@ def transcribe_audio(path: Path, settings: Settings) -> Transcription:
         return _fake_transcription(path, settings)
     if settings.asr_engine == "off":
         return Transcription(segments=[], language="zh", model="off", source="off", text="")
+    if settings.asr_engine == "sensevoice":
+        from .sensevoice import transcribe_sensevoice
+
+        return transcribe_sensevoice(path, settings)
 
     _ensure_cool_enough(settings)
     model = _load_model(settings)

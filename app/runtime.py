@@ -26,6 +26,7 @@ def runtime_path(settings: Settings) -> Path:
 
 def default_runtime(settings: Settings) -> dict[str, Any]:
     return {
+        "engine": settings.asr_engine,
         "device": settings.whisper_device,
         "device_index": settings.whisper_device_index,
         "model": settings.whisper_model,
@@ -37,6 +38,14 @@ def default_runtime(settings: Settings) -> dict[str, Any]:
 def _validated(settings: Settings, data: dict[str, Any]) -> dict[str, Any]:
     runtime = default_runtime(settings)
     runtime.update({key: data[key] for key in runtime if key in data})
+    if runtime.get("engine") not in {"faster", "sensevoice", "fake", "off"}:
+        runtime["engine"] = "faster"
+    if runtime["engine"] == "sensevoice":
+        runtime["device"] = "cpu"
+        runtime["model"] = "sensevoice-small"
+        runtime["compute_type"] = "int8"
+        runtime["device_index"] = 0
+        return runtime
     if runtime["device"] not in {"cpu", "cuda"}:
         runtime["device"] = "cpu"
     if runtime["device"] == "cuda":
@@ -58,6 +67,7 @@ def _validated(settings: Settings, data: dict[str, Any]) -> dict[str, Any]:
 
 def apply_runtime(settings: Settings, data: dict[str, Any]) -> dict[str, Any]:
     runtime = _validated(settings, data)
+    settings.asr_engine = runtime["engine"]
     settings.whisper_device = runtime["device"]
     settings.whisper_device_index = runtime["device_index"]
     settings.whisper_model = runtime["model"]

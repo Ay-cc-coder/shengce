@@ -223,6 +223,28 @@ LLM_MODEL=deepseek-chat
 
 有 NVIDIA 显卡时，使用下面的 `:cuda` 镜像；在 WebUI「运行状态」页可以直接选择 GPU 和模型。
 
+## SenseVoice-Small 中文引擎
+
+系统页现在可以切换两套识别引擎：
+
+- **faster-whisper**：CPU / GPU，原有模型；
+- **SenseVoice-Small**：中文优先，CPU 转写，几乎不占显存。
+
+切换方法：
+
+```text
+运行状态 → 识别引擎 → SenseVoice-Small → 应用 SenseVoice
+```
+
+SenseVoice 首次使用会下载约 230MB 的 int8 模型到：
+
+```text
+data/models/sensevoice/
+```
+
+之后复用。它使用 CPU 转写，不再占 GPU，适合油冷/无风扇的 NAS。
+在中文电话录音上通常比 Whisper-small 更准，速度也更快。
+
 ## AI 分类与文件名词表
 
 打开：

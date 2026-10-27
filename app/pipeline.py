@@ -68,7 +68,7 @@ class PipelineWorker:
             return self.guard_paused
 
     def _gpu_temperature(self) -> float | None:
-        if self.settings.whisper_device != "cuda":
+        if self.settings.asr_engine != "faster" or self.settings.whisper_device != "cuda":
             return None
         with self.temp_lock:
             now = time.monotonic()

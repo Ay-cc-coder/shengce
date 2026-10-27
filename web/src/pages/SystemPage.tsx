@@ -52,6 +52,7 @@ export function SystemPage() {
     pollMs: 3000,
   });
   const toast = useToast();
+  const [engine, setEngine] = useState<"faster" | "sensevoice">("faster");
   const [device, setDevice] = useState<"cpu" | "cuda">("cpu");
   const [gpuIndex, setGpuIndex] = useState(0);
   const [model, setModel] = useState("small");
@@ -65,6 +66,7 @@ export function SystemPage() {
 
   useEffect(() => {
     if (!data || initialized.current) return;
+    setEngine(data.asr.engine);
     setDevice(data.asr.device);
     setGpuIndex(data.asr.device_index);
     setModel(data.asr.model);
@@ -75,9 +77,10 @@ export function SystemPage() {
     setSaving(true);
     try {
       const next = await api.post<SystemInfo>("/api/system/asr", {
-        device,
-        device_index: gpuIndex,
-        model,
+        engine,
+        device: engine === "sensevoice" ? "cpu" : device,
+        device_index: engine === "sensevoice" ? 0 : gpuIndex,
+        model: engine === "sensevoice" ? "sensevoice-small" : model,
       });
       setData(next);
       toast.show("识别设备已更新，下一段录音会使用新设置。", "success");
@@ -128,6 +131,7 @@ export function SystemPage() {
   }
 
   const { asr, resources, queue, gpus, worker, thermal } = data;
+  const isSenseVoice = engine === "sensevoice";
   const currentGpu = gpus.find((gpu) => gpu.index === gpuIndex);
   const gpuAvailable = asr.gpu_supported && gpus.length > 0;
   const cpuPercent = Math.min(100, resources.cpu_percent);
@@ -154,7 +158,7 @@ export function SystemPage() {
         }
       />
 
-      {!asr.gpu_image ? (
+      {engine === "faster" && !asr.gpu_image ? (
         <div className="notice notice--warning">
           <WarningCircle size={20} aria-hidden="true" />
           <div>
@@ -181,7 +185,7 @@ export function SystemPage() {
         </div>
       ) : null}
 
-      {asr.gpu_image && !gpuAvailable ? (
+      {engine === "faster" && asr.gpu_image && !gpuAvailable ? (
         <div className="notice notice--warning">
           <WarningCircle size={20} aria-hidden="true" />
           <div>
@@ -206,6 +210,36 @@ export function SystemPage() {
               <span className="section-count">{asr.model}</span>
             </div>
 
+            <label className="field engine-field">
+              <span className="field__label">识别引擎</span>
+              <select
+                value={engine}
+                onChange={(event) => {
+                  const next = event.target.value as "faster" | "sensevoice";
+                  setEngine(next);
+                  if (next === "sensevoice") {
+                    setDevice("cpu");
+                    setModel("sensevoice-small");
+                  } else {
+                    setDevice(gpuAvailable ? "cuda" : "cpu");
+                    setModel("small");
+                  }
+                }}
+              >
+                <option value="faster">faster-whisper（GPU/CPU）</option>
+                <option value="sensevoice">SenseVoice-Small（中文，CPU）</option>
+              </select>
+            </label>
+
+            {isSenseVoice ? (
+              <div className="notice sensevoice-note">
+                <Cpu size={20} aria-hidden="true" />
+                <div>
+                  <strong>SenseVoice-Small 使用 CPU 转写。</strong>
+                  <p>中文识别更快，几乎不占显存，也不会再触发 GPU 掉卡。更适合当前油冷 NAS。</p>
+                </div>
+              </div>
+            ) : (
             <div className="device-picker">
               <button
                 type="button"
@@ -241,7 +275,9 @@ export function SystemPage() {
                 {device === "cuda" ? <CheckCircle size={18} weight="fill" aria-hidden="true" /> : null}
               </button>
             </div>
+            )}
 
+            {!isSenseVoice ? (
             <div className="device-controls">
               {gpuAvailable && gpus.length > 1 ? (
                 <label className="field">
@@ -271,6 +307,14 @@ export function SystemPage() {
                 {saving ? "正在应用" : "应用并重载模型"}
               </button>
             </div>
+            ) : null}
+            {isSenseVoice ? (
+              <div className="device-controls">
+                <button type="button" className="btn btn--primary" onClick={() => void applyDevice()} disabled={saving}>
+                  {saving ? "正在应用" : "应用 SenseVoice"}
+                </button>
+              </div>
+            ) : null}
             <p className="system-hint">
               切换设备或模型后，正在处理的文件会继续用旧设置；从下一段录音开始使用新设置。GPU 模式使用 float16，CPU 模式使用 int8。
               温度保护：≥{thermal.pause_c}°C 自动暂停，≤{thermal.resume_c}°C 自动继续；不判断风扇转速。
@@ -400,6 +444,7 @@ export function SystemPage() {
               <h2>当前配置</h2>
             </div>
             <dl className="file-facts">
+              <div><dt>引擎</dt><dd>{asr.engine === "sensevoice" ? "SenseVoice-Small" : "faster-whisper"}</dd></div>
               <div><dt>设备</dt><dd>{asr.device === "cuda" ? currentGpu?.name || "NVIDIA GPU" : "CPU"}</dd></div>
               <div><dt>模型</dt><dd>{asr.model}</dd></div>
               <div><dt>精度</dt><dd>{asr.compute_type}</dd></div>

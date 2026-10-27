@@ -259,6 +259,7 @@ def system_payload(
     gpu_supported = bool(settings.asr_gpu_supported and cuda_count > 0 and gpus)
     return {
         "asr": {
+            "engine": settings.asr_engine,
             "device": settings.whisper_device,
             "device_index": settings.whisper_device_index,
             "model": settings.whisper_model,
@@ -286,7 +287,7 @@ def system_payload(
             ),
         },
         "thermal": {
-            "enabled": settings.whisper_device == "cuda",
+            "enabled": settings.asr_engine == "faster" and settings.whisper_device == "cuda",
             "pause_c": settings.gpu_temp_pause,
             "resume_c": settings.gpu_temp_resume,
             "temperature_c": gpus[0].get("temperature_c") if gpus else None,
