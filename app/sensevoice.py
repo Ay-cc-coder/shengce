@@ -77,31 +77,30 @@ def reset_model() -> None:
         _recognizer_key = None
 
 
-def _decode_audio(path: Path) -> tuple[Any, float]:
+def _decode_chunks(path: Path, chunk_seconds: int = 30):  # type: ignore[no-untyped-def]
     import av
     import numpy as np
 
-    frames: list[Any] = []
-    duration = 0.0
+    chunk_samples = max(1, int(16000 * chunk_seconds))
+    buffer = np.empty(0, dtype=np.float32)
+    offset = 0.0
     with av.open(str(path)) as container:
         if not container.streams.audio:
             raise RuntimeError("文件里没有可读取的音轨")
         stream = container.streams.audio[0]
-        if container.duration:
-            duration = float(container.duration) / 1_000_000.0
         resampler = av.AudioResampler(format="flt", layout="mono", rate=16000)
         for frame in container.decode(stream):
             for output in resampler.resample(frame):
                 array = output.to_ndarray().reshape(-1).astype(np.float32)
-                if array.size:
-                    frames.append(array)
-    if not frames:
-        raise RuntimeError("没有解码出音频样本")
-    samples = np.concatenate(frames)
-    if duration <= 0:
-        duration = samples.size / 16000.0
-    return samples, duration
-
+                if not array.size:
+                    continue
+                buffer = np.concatenate([buffer, array])
+                while buffer.size >= chunk_samples:
+                    yield buffer[:chunk_samples], offset
+                    buffer = buffer[chunk_samples:]
+                    offset += chunk_seconds
+    if buffer.size:
+        yield buffer, offset
 
 def _segments_from_tokens(
     result: Any, duration: float, fallback_text: str
@@ -171,17 +170,32 @@ def _segments_from_tokens(
 
 def transcribe_sensevoice(path: Path, settings: Settings) -> Transcription:
     recognizer = _recognizer_for(settings)
-    samples, duration = _decode_audio(path)
-    stream = recognizer.create_stream()
-    stream.accept_waveform(16000, samples)
-    recognizer.decode_stream(stream)
-    result = stream.result
-    text = str(getattr(result, "text", "") or "").strip()
-    segments = _segments_from_tokens(result, duration, text)
+    segments: list[TranscriptSegment] = []
+    texts: list[str] = []
+    for samples, offset in _decode_chunks(path):
+        stream = recognizer.create_stream()
+        stream.accept_waveform(16000, samples)
+        recognizer.decode_stream(stream)
+        result = stream.result
+        text = str(getattr(result, "text", "") or "").strip()
+        chunk_duration = samples.size / 16000.0
+        for segment in _segments_from_tokens(result, chunk_duration, text):
+            segments.append(
+                TranscriptSegment(
+                    start=round(segment.start + offset, 2),
+                    end=round(segment.end + offset, 2),
+                    text=segment.text,
+                )
+            )
+        if text:
+            texts.append(text)
+    full_text = " ".join(texts).strip()
+    if not segments and full_text:
+        segments = [TranscriptSegment(start=0.0, end=0.0, text=full_text)]
     return Transcription(
         segments=segments,
         language="zh",
         model="sensevoice-small",
         source="sensevoice",
-        text=" ".join(segment.text for segment in segments) or text,
+        text=full_text or " ".join(segment.text for segment in segments),
     )
